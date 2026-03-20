@@ -20,17 +20,29 @@ if menu == "Registrar Nueva SOLPED":
     st.subheader("📝 Registrar Nueva Solicitud")
     with st.form("form_registro"):
         numero = st.text_input("Número de SOLPED (Oficio)")
+        
         lista_areas = [
-            "Almacenes", "Capital Humano", "CENDI", "CEPIMAG",
-            "Dirección de Instalaciones Fijas", "Dirección de Material Rodante",
-            "Dirección de Transportación", "Gerencia de Salud", "Organización y Sistemas"
+            "CAPITAL HUMANO",
+            "COORDINACIÓN DE EVALUACIÓN DE PROYECTOS Y MANTENIMIENTO DE ÁREAS GENERALES",
+            "DIRECCIÓN DE INSTALACIONES FIJAS",
+            "DIRECCIÓN DE MANTENIMIENTO DE MATERIAL RODANTE",
+            "DIRECCIÓN DE MEDIOS",
+            "DIRECCIÓN DE TRANSPORTACIÓN",
+            "DIRECCIÓN GENERAL DE ADMINISTRACIÓN Y FINANZAS",
+            "DIRECCIÓN GENERAL DE OPERACIÓN",
+            "GERENCIA DE ALMACENES Y SUMINISTROS",
+            "GERENCIA DE INGENIERÍA Y NUEVOS PROYECTOS",
+            "GERENCIA DE ORGANIZACIÓN Y SISTEMAS",
+            "GERENCIA DE SALUD Y BIENESTAR SOCIAL",
+            "GERENCIA DE SEGURIDAD INSTITUCIONAL",
+            "PREVIAS"
         ]
         lista_areas.sort()
+        
         area = st.selectbox("Área Usuaria", lista_areas)
         coordinacion = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
         link = st.text_input("Link del PDF escaneado (Google Drive)")
         enviado = st.form_submit_button("Guardar SOLPED")
-        
         if enviado:
             if numero == "":
                 st.warning("⚠️ Por favor, ingresa el Número de SOLPED.")
