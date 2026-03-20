@@ -38,25 +38,40 @@ if menu == "Registrar Nueva SOLPED":
             "PREVIAS"
         ]
         lista_areas.sort()
-        
         area = st.selectbox("Área Usuaria", lista_areas)
         coordinacion = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
-        link = st.text_input("Link del PDF escaneado (Google Drive)")
+        
+        # --- LOS NUEVOS CAMBIOS ESTRELLA ---
+        st.divider()
+        st.write("📌 **Estatus y Documentación**")
+        estatus = st.selectbox("Estatus de la SOLPED", ["En Proceso", "Adjudicado", "Cancelado"])
+        
+        archivo_solped = st.file_uploader("📥 Subir SOLPED escaneada (PDF)", type=["pdf"])
+        archivo_contrato = st.file_uploader("📥 Subir Contrato (PDF)", type=["pdf"])
+        st.divider()
+        # -----------------------------------
+        
         enviado = st.form_submit_button("Guardar SOLPED")
+        
         if enviado:
             if numero == "":
                 st.warning("⚠️ Por favor, ingresa el Número de SOLPED.")
             else:
                 try:
+                    # Simulamos que leemos el PDF para el demo
+                    estado_archivos = "Sin archivos"
+                    if archivo_solped or archivo_contrato:
+                        estado_archivos = "📁 Expedientes cargados"
+                        
                     conexion = sqlite3.connect('solped_data.db')
                     cursor = conexion.cursor()
                     cursor.execute('''
-                        INSERT INTO solicitudes_solped (numero_solped, area_usuaria, coordinacion_asignada, link_pdf)
-                        VALUES (?, ?, ?, ?)
-                    ''', (numero, area, coordinacion, link))
+                        INSERT INTO solicitudes_solped (numero_solped, area_usuaria, coordinacion_asignada, estatus, link_pdf)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (numero, area, coordinacion, estatus, estado_archivos))
                     conexion.commit()
                     conexion.close()
-                    st.success(f"✅ ¡Éxito! La SOLPED {numero} se guardó correctamente.")
+                    st.success(f"✅ ¡Éxito! La SOLPED {numero} quedó como '{estatus}' y sus documentos fueron procesados.")
                 except sqlite3.IntegrityError:
                     st.error(f"❌ Error: La SOLPED {numero} ya está registrada en el sistema.")
                 except Exception as e:
