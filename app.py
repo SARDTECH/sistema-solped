@@ -36,24 +36,23 @@ if menu == "Registrar Nueva SOLPED":
             "🔘 GERENCIA DE SALUD Y BIENESTAR SOCIAL",
             "🌐 GERENCIA DE ORGANIZACIÓN Y SISTEMAS",
             "🩵 PREVIAS"
-]
+        ]
         
-  area = st.selectbox("Área Usuaria", lista_areas)
-    coordinacion = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
-    
-    # --- LOS NUEVOS CAMBIOS ESTRELLA ---
-    st.divider()
-    st.write("📌 **Estatus y Documentación**")
-    estatus = st.selectbox("Estatus de la SOLPED", ["En Proceso", "Adjudicado", "Cancelado"])
-    
-    archivo_solped = st.file_uploader("📥 Subir SOLPED escaneada (PDF)", type=["pdf"])
-    archivo_contrato = st.file_uploader("📥 Subir Contrato (PDF)", type=["pdf"])
-    st.divider()
-    # -----------------------------------
-    
-    enviado = st.form_submit_button("Guardar SOLPED")
-    
-    if enviado:
+        area = st.selectbox("Área Usuaria", lista_areas)
+        coordinacion = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
+        
+        # --- LOS NUEVOS CAMBIOS ESTRELLA ---
+        st.divider()
+        st.write("📌 **Estatus y Documentación**")
+        estatus = st.selectbox("Estatus de la SOLPED", ["En Proceso", "Adjudicado", "Cancelado"])
+        
+        archivo_solped = st.file_uploader("📥 Subir SOLPED escaneada (PDF)", type=["pdf"])
+        archivo_contrato = st.file_uploader("📥 Subir Contrato (PDF)", type=["pdf"])
+        st.divider()
+        
+        enviado = st.form_submit_button("Guardar SOLPED")
+        
+        if enviado:
             if numero == "":
                 st.warning("⚠️ Por favor, ingresa el Número de SOLPED.")
             else:
