@@ -22,38 +22,38 @@ if menu == "Registrar Nueva SOLPED":
         numero = st.text_input("Número de SOLPED (Oficio)")
         
         lista_areas = [
-            "CAPITAL HUMANO",
-            "COORDINACIÓN DE EVALUACIÓN DE PROYECTOS Y MANTENIMIENTO DE ÁREAS GENERALES",
-            "DIRECCIÓN DE INSTALACIONES FIJAS",
-            "DIRECCIÓN DE MANTENIMIENTO DE MATERIAL RODANTE",
-            "DIRECCIÓN DE MEDIOS",
-            "DIRECCIÓN DE TRANSPORTACIÓN",
-            "DIRECCIÓN GENERAL DE ADMINISTRACIÓN Y FINANZAS",
-            "DIRECCIÓN GENERAL DE OPERACIÓN",
-            "GERENCIA DE ALMACENES Y SUMINISTROS",
-            "GERENCIA DE INGENIERÍA Y NUEVOS PROYECTOS",
-            "GERENCIA DE ORGANIZACIÓN Y SISTEMAS",
-            "GERENCIA DE SALUD Y BIENESTAR SOCIAL",
-            "GERENCIA DE SEGURIDAD INSTITUCIONAL",
-            "PREVIAS"
-        ]
-        lista_areas.sort()
-        area = st.selectbox("Área Usuaria", lista_areas)
-        coordinacion = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
+            "🟡 DIRECCIÓN GENERAL DE OPERACIÓN",
+            "🟢 GERENCIA DE INGENIERÍA Y NUEVOS PROYECTOS",
+            "🔵 CAPITAL HUMANO",
+            "🩷 COORDINACIÓN DE EVALUACIÓN DE PROYECTOS Y MANTENIMIENTO DE ÁREAS GENERALES",
+            "🟠 DIRECCIÓN GENERAL DE ADMINISTRACIÓN Y FINANZAS",
+            "🔴 DIRECCIÓN DE MANTENIMIENTO DE MATERIAL RODANTE",
+            "🟣 DIRECCIÓN DE INSTALACIONES FIJAS",
+            "⚫ DIRECCIÓN DE TRANSPORTACIÓN",
+            "🟤 GERENCIA DE SEGURIDAD INSTITUCIONAL",
+            "⚪ DIRECCIÓN DE MEDIOS",
+            "🍷 GERENCIA DE ALMACENES Y SUMINISTROS",
+            "🔘 GERENCIA DE SALUD Y BIENESTAR SOCIAL",
+            "🌐 GERENCIA DE ORGANIZACIÓN Y SISTEMAS",
+            "🩵 PREVIAS"
+]
         
-        # --- LOS NUEVOS CAMBIOS ESTRELLA ---
-        st.divider()
-        st.write("📌 **Estatus y Documentación**")
-        estatus = st.selectbox("Estatus de la SOLPED", ["En Proceso", "Adjudicado", "Cancelado"])
-        
-        archivo_solped = st.file_uploader("📥 Subir SOLPED escaneada (PDF)", type=["pdf"])
-        archivo_contrato = st.file_uploader("📥 Subir Contrato (PDF)", type=["pdf"])
-        st.divider()
-        # -----------------------------------
-        
-        enviado = st.form_submit_button("Guardar SOLPED")
-        
-        if enviado:
+  area = st.selectbox("Área Usuaria", lista_areas)
+    coordinacion = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
+    
+    # --- LOS NUEVOS CAMBIOS ESTRELLA ---
+    st.divider()
+    st.write("📌 **Estatus y Documentación**")
+    estatus = st.selectbox("Estatus de la SOLPED", ["En Proceso", "Adjudicado", "Cancelado"])
+    
+    archivo_solped = st.file_uploader("📥 Subir SOLPED escaneada (PDF)", type=["pdf"])
+    archivo_contrato = st.file_uploader("📥 Subir Contrato (PDF)", type=["pdf"])
+    st.divider()
+    # -----------------------------------
+    
+    enviado = st.form_submit_button("Guardar SOLPED")
+    
+    if enviado:
             if numero == "":
                 st.warning("⚠️ Por favor, ingresa el Número de SOLPED.")
             else:
