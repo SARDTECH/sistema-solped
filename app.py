@@ -48,12 +48,11 @@ menu = st.sidebar.radio(
 )
 
 # ==========================================
-# FUNCIONES DE LIMPIEZA DE FECHAS (Escudo)
+# FUNCIONES DE LIMPIEZA DE FECHAS
 # ==========================================
 def limpiar_fecha_metro(fecha_str):
     try:
         if pd.isna(fecha_str) or str(fecha_str).strip() == "": return pd.NaT
-        # Forzar formato DD-MM-YYYY
         f = str(fecha_str).replace('/', '-').strip()
         partes = f.split('-')
         if len(partes) == 3 and len(partes[2]) == 2:
@@ -76,10 +75,8 @@ if menu == "📊 Dashboard Gerencial":
         if df.empty:
             st.info("No hay datos para mostrar en la base de datos.")
         else:
-            # 1. Limpieza total de fechas
             df['fecha_limpia'] = df['fecha_oficio'].apply(limpiar_fecha_metro)
             
-            # 2. Rango de fechas por defecto (de la base de datos)
             fechas_validas = df['fecha_limpia'].dropna()
             if not fechas_validas.empty:
                 min_date = fechas_validas.min().date()
@@ -88,10 +85,9 @@ if menu == "📊 Dashboard Gerencial":
                 min_date = datetime.date.today() - datetime.timedelta(days=30)
                 max_date = datetime.date.today()
             
-            # 3. FILTRO POR RANGO EN EL SIDEBAR
+            # FILTRO POR RANGO EN EL SIDEBAR (Sin cuadro azul)
             st.sidebar.markdown("---")
             st.sidebar.subheader("📅 Rango de Fechas")
-            st.sidebar.info("Selecciona el día de inicio y el día de fin.")
             
             rango_fechas = st.sidebar.date_input(
                 "Periodo de Consulta:",
@@ -101,9 +97,8 @@ if menu == "📊 Dashboard Gerencial":
                 format="DD/MM/YYYY"
             )
             
-            # 4. APLICAR FILTRO
             df_filtrado = df.copy()
-            if len(rango_fechas) == 2: # Solo filtra si hay inicio y fin
+            if len(rango_fechas) == 2:
                 fecha_inicio, fecha_fin = rango_fechas
                 df_filtrado = df_filtrado[
                     (df_filtrado['fecha_limpia'].dt.date >= fecha_inicio) & 
@@ -112,14 +107,12 @@ if menu == "📊 Dashboard Gerencial":
 
             df_filtrado['monto'] = pd.to_numeric(df_filtrado['monto'], errors='coerce').fillna(0)
 
-            # Tarjetas
             col1, col2, col3 = st.columns(3)
             col1.metric("Total de SOLPEDs", len(df_filtrado))
             col2.metric("Monto Total Invertido", f"${df_filtrado['monto'].sum():,.2f}")
             col3.metric("Promedio por Oficio", f"${(df_filtrado['monto'].mean() if len(df_filtrado)>0 else 0):,.2f}")
             st.divider()
             
-            # Gráficas
             colA, colB = st.columns(2)
             with colA:
                 st.write("**Gasto por Área Usuaria**")
@@ -128,11 +121,10 @@ if menu == "📊 Dashboard Gerencial":
                 st.write("**Estatus de SOLPEDs**")
                 if 'estatus' in df_filtrado.columns: st.bar_chart(df_filtrado['estatus'].value_counts())
             
-            # Tabla
             st.subheader("📋 Base de Datos Filtrada")
             cols_mostrar = ['numero_solped', 'area_usuaria', 'monto', 'fecha_oficio', 'estatus', 'link_pdf']
             cols_reales = [c for c in cols_mostrar if c in df_filtrado.columns]
-            st.dataframe(df_filtrado[cols_reales], column_config={"link_pdf": st.column_config.LinkColumn("Archivo PDF")}, use_container_width=True)
+            st.dataframe(df_filtrado[cols_reales], column_config={"link_pdf": st.column_config.LinkColumn("Carpeta / Archivo")}, use_container_width=True)
             
     except Exception as e:
         st.error(f"Error de sistema: {e}")
@@ -151,9 +143,11 @@ elif menu == "📝 Registrar SOLPED":
             monto = st.number_input("Monto Estimado ($)", min_value=0.0)
         with col2:
             coord = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
-            link_pdf = st.text_input("Enlace al Documento (Google Drive)")
             estatus = st.selectbox("Estatus de la Compra", ["EN PROCESO", "COMPLETADA", "CANCELADA"])
-        
+            # NUEVO CONCEPTO: CARPETA DE EXPEDIENTE
+            link_pdf = st.text_input("Enlace a la Carpeta del Expediente (Drive, OneDrive, etc.)")
+            st.caption("☝️ Pega aquí el enlace de la carpeta que contiene la SOLPED, contratos y anexos.")
+            
         desc = st.text_area("Justificación / Descripción Breve")
         if st.form_submit_button("Subir al Sistema"):
             if numero == "":
@@ -212,7 +206,7 @@ elif menu == "🔍 Buscar y Editar":
                         st.write(f"**Fecha Registro:** {datos.get('fecha_oficio', 'N/A')}")
                         link = datos.get('link_pdf', '')
                         if link and link.startswith("http"):
-                            st.link_button("📂 Consultar Expediente PDF", link)
+                            st.link_button("📂 Abrir Carpeta del Expediente", link)
                         else:
                             st.info("Sin expediente digital anexado.")
                 
@@ -224,7 +218,7 @@ elif menu == "🔍 Buscar y Editar":
                         idx_estatus = lista_estatus.index(estatus_actual) if estatus_actual in lista_estatus else 0
                         
                         nuevo_estatus = st.selectbox("Actualizar Estatus", lista_estatus, index=idx_estatus)
-                        nuevo_link = st.text_input("Actualizar Enlace PDF (Drive)", value=datos.get('link_pdf', ''))
+                        nuevo_link = st.text_input("Actualizar Enlace de la Carpeta", value=datos.get('link_pdf', ''))
                         nuevo_monto = st.number_input("Corregir Monto ($)", value=float(datos.get('monto', 0)), min_value=0.0)
                         
                         if st.form_submit_button("💾 Guardar Cambios"):
