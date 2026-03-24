@@ -24,52 +24,94 @@ menu = st.sidebar.selectbox(
 # PANTALLA 1: REGISTRAR DATOS GENERALES
 # ---------------------------------------------------------
 if menu == "Registrar Nueva SOLPED":
-    st.subheader("📝 Registrar Nueva Solicitud")
+    st.subheader("📝 Registrar Nueva Solicitud (Fase 2)")
     
-    # AGREGAMOS EL CLEAR_ON_SUBMIT PARA LIMPIAR LA PANTALLA
     with st.form("form_registro", clear_on_submit=True):
-        numero = st.text_input("Número de SOLPED (Oficio)")
+        # --- SECCIÓN 1: DATOS GENERALES ---
+        st.write("📌 **Datos Generales**")
+        col1, col2 = st.columns(2) # Partimos la pantalla en 2
         
-        # LLAMAMOS A LA LISTA DESDE EL OTRO ARCHIVO
-        area = st.selectbox("Área Usuaria", LISTA_AREAS)
-        coordinacion = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
+        with col1:
+            numero = st.text_input("Número de SOLPED (Obligatorio)*")
+            fecha_oficio = st.text_input("Fecha Oficio (ej. 01-08-25)")
+            oficio = st.text_input("Oficio")
+            
+        with col2:
+            area = st.selectbox("Área Usuaria", LISTA_AREAS)
+            coordinacion = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
         
+        # --- SECCIÓN 2: DETALLES DE LA COMPRA ---
         st.divider()
-        st.write("📌 **Estatus y Documentación**")
-        estatus = st.selectbox("Estatus de la SOLPED", ["En Proceso", "Adjudicado", "Cancelado"])
+        st.write("🛒 **Detalles de la Compra**")
+        descripcion = st.text_area("Descripción de la SOLPED")
         
+        col3, col4 = st.columns(2)
+        with col3:
+            no_partidas = st.number_input("No. Partidas", min_value=0, step=1)
+            suficiencia_01 = st.text_input("Suficiencia 01")
+            procedimiento = st.text_input("Procedimiento")
+            
+        with col4:
+            monto = st.number_input("Monto Estimado ($)", min_value=0.0, step=100.0)
+            suficiencia_02 = st.text_input("Suficiencia 02")
+            fecha_recibido = st.text_input("Fecha de Recibido en Área Operadora")
+
+        # --- SECCIÓN 3: CONTRATO Y ESTATUS ---
+        st.divider()
+        st.write("📋 **Contrato y Estatus**")
+        col5, col6 = st.columns(2)
+        
+        with col5:
+            contrato = st.text_input("Número de Contrato")
+            estatus = st.selectbox("Estatus de la SOLPED", ["En Proceso", "Adjudicado", "Cancelado"])
+            
+        with col6:
+            monto_contrato = st.number_input("Monto de Contrato ($)", min_value=0.0, step=100.0)
+        
+        # --- SECCIÓN 4: DOCUMENTOS ---
+        st.write("📂 **Documentación (Opcional)**")
         archivo_solped = st.file_uploader("📥 Subir SOLPED escaneada (PDF)", type=["pdf"])
         archivo_contrato = st.file_uploader("📥 Subir Contrato (PDF)", type=["pdf"])
+        
         st.divider()
+        enviado = st.form_submit_button("Guardar SOLPED Completa")
         
-        enviado = st.form_submit_button("Guardar SOLPED")
-        
+        # --- LÓGICA DE GUARDADO EN LA BÓVEDA ---
         if enviado:
             if numero == "":
                 st.warning("⚠️ Por favor, ingresa el Número de SOLPED.")
             else:
-                with st.spinner('Procesando documentos y guardando en la Nube Segura...'):
+                with st.spinner('Procesando datos y guardando...'):
                     try:
-                        # Simulamos estado de archivos para el demo
                         estado_archivos = "Sin archivos"
                         if archivo_solped or archivo_contrato:
                             estado_archivos = "📁 Expedientes cargados"
                             
-                        # --- MAGIA: GUARDAR EN SUPABASE ---
+                        # Empacamos TODOS los datos nuevos
                         datos = {
                             "numero_solped": numero,
                             "area_usuaria": area,
                             "coordinacion_asignada": coordinacion,
                             "estatus": estatus,
-                            "link_pdf": estado_archivos
+                            "link_pdf": estado_archivos,
+                            "no_partidas": no_partidas,
+                            "monto": monto,
+                            "fecha_oficio": fecha_oficio,
+                            "oficio": oficio,
+                            "descripcion": descripcion,
+                            "suficiencia_01": suficiencia_01,
+                            "suficiencia_02": suficiencia_02,
+                            "procedimiento": procedimiento,
+                            "fecha_recibido": fecha_recibido,
+                            "contrato": contrato,
+                            "monto_contrato": monto_contrato
                         }
-                        # Insertamos los datos en la tabla que creaste
-                        respuesta = supabase.table("solicitudes_solped").insert(datos).execute()
                         
-                        st.success(f"✅ Guardado con éxito. La SOLPED {numero} fue registrada correctamente.")
+                        # Inyectamos en Supabase
+                        respuesta = supabase.table("solicitudes_solped").insert(datos).execute()
+                        st.success(f"✅ Guardado con éxito. La SOLPED {numero} fue registrada correctamente con todos sus detalles.")
                         
                     except Exception as e:
-                        # Supabase devuelve un error específico si el número ya existe (Unique violation)
                         if 'duplicate' in str(e).lower() or 'unique' in str(e).lower():
                             st.error(f"❌ Error: La SOLPED {numero} ya está registrada en el sistema.")
                         else:
