@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from supabase import create_client
-import re
+import datetime
 
 # ==========================================
 # CONFIGURACIÓN TOP Y DISEÑO METRO CDMX
@@ -36,11 +36,10 @@ def init_connection():
 supabase = init_connection()
 
 # --- MENÚ DE NAVEGACIÓN ---
-# ¡Aquí está el arreglo del logo! Lee el nombre exacto de tu GitHub
 try:
     st.sidebar.image("logo m.png", width=150)
 except:
-    pass # Si no lo encuentra, no pone mensaje de error, solo se lo salta
+    pass
 
 st.sidebar.title("Gerencia de Compras")
 menu = st.sidebar.radio(
@@ -49,27 +48,20 @@ menu = st.sidebar.radio(
 )
 
 # ==========================================
-# FUNCIONES DE EXTRACCIÓN SÚPER SEGURA
+# FUNCIONES DE LIMPIEZA DE FECHAS (Escudo)
 # ==========================================
-def extraer_año_seguro(fecha_str):
+def limpiar_fecha_metro(fecha_str):
     try:
-        if pd.isna(fecha_str) or str(fecha_str).strip() == "": return None
-        partes = str(fecha_str).replace('/', '-').split('-')
-        if len(partes) == 3:
-            year = partes[2].strip()
-            if len(year) == 2: return int("20" + year)
-            if len(year) == 4: return int(year)
-        return pd.to_datetime(fecha_str, errors='coerce', dayfirst=True).year
+        if pd.isna(fecha_str) or str(fecha_str).strip() == "": return pd.NaT
+        # Forzar formato DD-MM-YYYY
+        f = str(fecha_str).replace('/', '-').strip()
+        partes = f.split('-')
+        if len(partes) == 3 and len(partes[2]) == 2:
+            partes[2] = "20" + partes[2]
+            f = f"{partes[0]}-{partes[1]}-{partes[2]}"
+        return pd.to_datetime(f, format='%d-%m-%Y', errors='coerce')
     except:
-        return None
-
-def extraer_mes_seguro(fecha_str):
-    try:
-        partes = str(fecha_str).replace('/', '-').split('-')
-        if len(partes) == 3: return int(partes[1].strip())
-        return pd.to_datetime(fecha_str, errors='coerce', dayfirst=True).month
-    except:
-        return None
+        return pd.to_datetime(str(fecha_str), errors='coerce', dayfirst=True)
 
 # ==========================================
 # PANTALLA 1: DASHBOARD GERENCIAL
@@ -84,35 +76,50 @@ if menu == "📊 Dashboard Gerencial":
         if df.empty:
             st.info("No hay datos para mostrar en la base de datos.")
         else:
-            df['año_real'] = df['fecha_oficio'].apply(extraer_año_seguro)
-            df['mes_real'] = df['fecha_oficio'].apply(extraer_mes_seguro)
+            # 1. Limpieza total de fechas
+            df['fecha_limpia'] = df['fecha_oficio'].apply(limpiar_fecha_metro)
             
-            años_lista = df['año_real'].dropna().astype(int).unique().tolist()
-            años_lista.sort(reverse=True)
+            # 2. Rango de fechas por defecto (de la base de datos)
+            fechas_validas = df['fecha_limpia'].dropna()
+            if not fechas_validas.empty:
+                min_date = fechas_validas.min().date()
+                max_date = fechas_validas.max().date()
+            else:
+                min_date = datetime.date.today() - datetime.timedelta(days=30)
+                max_date = datetime.date.today()
             
+            # 3. FILTRO POR RANGO EN EL SIDEBAR
             st.sidebar.markdown("---")
-            st.sidebar.subheader("📅 Filtros de Consulta")
-            f_año = st.sidebar.selectbox("Seleccionar Año", ["Todos"] + años_lista)
+            st.sidebar.subheader("📅 Rango de Fechas")
+            st.sidebar.info("Selecciona el día de inicio y el día de fin.")
             
-            meses_nombres = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 
-                             7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
-            f_mes = st.sidebar.selectbox("Seleccionar Mes", ["Todos"] + list(meses_nombres.values()))
+            rango_fechas = st.sidebar.date_input(
+                "Periodo de Consulta:",
+                value=(min_date, max_date),
+                min_value=min_date,
+                max_value=max_date,
+                format="DD/MM/YYYY"
+            )
             
+            # 4. APLICAR FILTRO
             df_filtrado = df.copy()
-            if f_año != "Todos":
-                df_filtrado = df_filtrado[df_filtrado['año_real'] == int(f_año)]
-            if f_mes != "Todos":
-                num_mes = [k for k, v in meses_nombres.items() if v == f_mes][0]
-                df_filtrado = df_filtrado[df_filtrado['mes_real'] == num_mes]
+            if len(rango_fechas) == 2: # Solo filtra si hay inicio y fin
+                fecha_inicio, fecha_fin = rango_fechas
+                df_filtrado = df_filtrado[
+                    (df_filtrado['fecha_limpia'].dt.date >= fecha_inicio) & 
+                    (df_filtrado['fecha_limpia'].dt.date <= fecha_fin)
+                ]
 
             df_filtrado['monto'] = pd.to_numeric(df_filtrado['monto'], errors='coerce').fillna(0)
 
+            # Tarjetas
             col1, col2, col3 = st.columns(3)
             col1.metric("Total de SOLPEDs", len(df_filtrado))
             col2.metric("Monto Total Invertido", f"${df_filtrado['monto'].sum():,.2f}")
             col3.metric("Promedio por Oficio", f"${(df_filtrado['monto'].mean() if len(df_filtrado)>0 else 0):,.2f}")
             st.divider()
             
+            # Gráficas
             colA, colB = st.columns(2)
             with colA:
                 st.write("**Gasto por Área Usuaria**")
@@ -121,6 +128,7 @@ if menu == "📊 Dashboard Gerencial":
                 st.write("**Estatus de SOLPEDs**")
                 if 'estatus' in df_filtrado.columns: st.bar_chart(df_filtrado['estatus'].value_counts())
             
+            # Tabla
             st.subheader("📋 Base de Datos Filtrada")
             cols_mostrar = ['numero_solped', 'area_usuaria', 'monto', 'fecha_oficio', 'estatus', 'link_pdf']
             cols_reales = [c for c in cols_mostrar if c in df_filtrado.columns]
@@ -139,7 +147,7 @@ elif menu == "📝 Registrar SOLPED":
         with col1:
             numero = st.text_input("Número de SOLPED / Oficio *")
             area = st.selectbox("Área Usuaria", ["DIRECCIÓN DE INSTALACIONES FIJAS", "DIRECCIÓN DE MANTENIMIENTO DE MATERIAL RODANTE", "CAPITAL HUMANO", "DIRECCIÓN GENERAL DE OPERACIÓN", "OTRO"])
-            fecha = st.date_input("Fecha del Documento")
+            fecha = st.date_input("Fecha del Documento", format="DD/MM/YYYY")
             monto = st.number_input("Monto Estimado ($)", min_value=0.0)
         with col2:
             coord = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
@@ -151,7 +159,8 @@ elif menu == "📝 Registrar SOLPED":
             if numero == "":
                 st.error("❌ El Número de SOLPED es obligatorio.")
             else:
-                supabase.table("solicitudes_solped").insert({"numero_solped": numero, "area_usuaria": area, "coordinacion_asignada": coord, "monto": monto, "fecha_oficio": str(fecha), "link_pdf": link_pdf, "descripcion": desc, "estatus": estatus}).execute()
+                fecha_formato_db = fecha.strftime('%d-%m-%Y')
+                supabase.table("solicitudes_solped").insert({"numero_solped": numero, "area_usuaria": area, "coordinacion_asignada": coord, "monto": monto, "fecha_oficio": fecha_formato_db, "link_pdf": link_pdf, "descripcion": desc, "estatus": estatus}).execute()
                 st.success(f"✅ SOLPED {numero} registrada.")
 
 # ==========================================
@@ -174,12 +183,11 @@ elif menu == "🛒 Agregar Artículos":
     except Exception as e: st.error(f"Error: {e}")
 
 # ==========================================
-# PANTALLA 4: BUSCAR Y EDITAR (CON BOTÓN)
+# PANTALLA 4: BUSCAR Y EDITAR
 # ==========================================
 elif menu == "🔍 Buscar y Editar":
     st.title("🔍 Localizador y Edición de Documentos")
     
-    # --- FORMULARIO DE BÚSQUEDA ---
     with st.form("form_buscar"):
         busqueda = st.text_input("Ingrese el Número exacto de SOLPED:")
         boton_buscar = st.form_submit_button("🔍 Buscar SOLPED")
