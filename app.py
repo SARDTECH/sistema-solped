@@ -1,7 +1,16 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
 from config import LISTA_AREAS
+from supabase import create_client, Client
+
+# --- CONEXIÓN A LA BÓVEDA DE SUPABASE ---
+url_bd = st.secrets["SUPABASE_URL"]
+llave_bd = st.secrets["SUPABASE_KEY"]
+supabase: Client = create_client(url_bd, llave_bd)
+# ----------------------------------------
+
+# Configuración de la página
+st.set_page_config(page_title="Sistema SOLPED", page_icon="📊", layout="centered")
 
 # Configuración de la página
 st.set_page_config(page_title="Sistema SOLPED", page_icon="📊", layout="centered")
@@ -42,27 +51,32 @@ if menu == "Registrar Nueva SOLPED":
             if numero == "":
                 st.warning("⚠️ Por favor, ingresa el Número de SOLPED.")
             else:
-                # AGREGAMOS EL SPINNER DE CARGA VISUAL
-                with st.spinner('Procesando documentos y guardando en base de datos...'):
+                with st.spinner('Procesando documentos y guardando en la Nube Segura...'):
                     try:
-                        # Simulamos que leemos el PDF por ahora
+                        # Simulamos estado de archivos para el demo
                         estado_archivos = "Sin archivos"
                         if archivo_solped or archivo_contrato:
                             estado_archivos = "📁 Expedientes cargados"
                             
-                        conexion = sqlite3.connect('solped_data.db')
-                        cursor = conexion.cursor()
-                        cursor.execute('''
-                            INSERT INTO solicitudes_solped (numero_solped, area_usuaria, coordinacion_asignada, estatus, link_pdf)
-                            VALUES (?, ?, ?, ?, ?)
-                        ''', (numero, area, coordinacion, estatus, estado_archivos))
-                        conexion.commit()
-                        conexion.close()
-                        st.success(f"✅ ¡Éxito! La SOLPED {numero} quedó guardada.")
-                    except sqlite3.IntegrityError:
-                        st.error(f"❌ Error: La SOLPED {numero} ya está registrada en el sistema.")
+                        # --- MAGIA: GUARDAR EN SUPABASE ---
+                        datos = {
+                            "numero_solped": numero,
+                            "area_usuaria": area,
+                            "coordinacion_asignada": coordinacion,
+                            "estatus": estatus,
+                            "link_pdf": estado_archivos
+                        }
+                        # Insertamos los datos en la tabla que creaste
+                        respuesta = supabase.table("solicitudes_solped").insert(datos).execute()
+                        
+                        st.success(f"✅ ¡Éxito! La SOLPED {numero} quedó guardada permanentemente en la nube.")
+                        
                     except Exception as e:
-                        st.error(f"Ocurrió un error: {e}")
+                        # Supabase devuelve un error específico si el número ya existe (Unique violation)
+                        if 'duplicate' in str(e).lower() or 'unique' in str(e).lower():
+                            st.error(f"❌ Error: La SOLPED {numero} ya está registrada en el sistema.")
+                        else:
+                            st.error(f"Ocurrió un error en la conexión: {e}")
                         
 # ---------------------------------------------------------
 # PANTALLA 2: AGREGAR LOS "MIL CÓDIGOS"
