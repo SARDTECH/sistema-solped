@@ -1,6 +1,7 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
+from config import LISTA_AREAS
 
 # Configuración de la página
 st.set_page_config(page_title="Sistema SOLPED", page_icon="📊", layout="centered")
@@ -18,30 +19,15 @@ menu = st.sidebar.selectbox(
 # ---------------------------------------------------------
 if menu == "Registrar Nueva SOLPED":
     st.subheader("📝 Registrar Nueva Solicitud")
-    with st.form("form_registro"):
+    
+    # AGREGAMOS EL CLEAR_ON_SUBMIT PARA LIMPIAR LA PANTALLA
+    with st.form("form_registro", clear_on_submit=True):
         numero = st.text_input("Número de SOLPED (Oficio)")
         
-        lista_areas = [
-            "🟡 DIRECCIÓN GENERAL DE OPERACIÓN",
-            "🟢 GERENCIA DE INGENIERÍA Y NUEVOS PROYECTOS",
-            "🔵 CAPITAL HUMANO",
-            "🩷 COORDINACIÓN DE EVALUACIÓN DE PROYECTOS Y MANTENIMIENTO DE ÁREAS GENERALES",
-            "🟠 DIRECCIÓN GENERAL DE ADMINISTRACIÓN Y FINANZAS",
-            "🔴 DIRECCIÓN DE MANTENIMIENTO DE MATERIAL RODANTE",
-            "🟣 DIRECCIÓN DE INSTALACIONES FIJAS",
-            "⚫ DIRECCIÓN DE TRANSPORTACIÓN",
-            "🟤 GERENCIA DE SEGURIDAD INSTITUCIONAL",
-            "⚪ DIRECCIÓN DE MEDIOS",
-            "🍷 GERENCIA DE ALMACENES Y SUMINISTROS",
-            "🔘 GERENCIA DE SALUD Y BIENESTAR SOCIAL",
-            "🌐 GERENCIA DE ORGANIZACIÓN Y SISTEMAS",
-            "🩵 PREVIAS"
-        ]
-        
-        area = st.selectbox("Área Usuaria", lista_areas)
+        # LLAMAMOS A LA LISTA DESDE EL OTRO ARCHIVO
+        area = st.selectbox("Área Usuaria", LISTA_AREAS)
         coordinacion = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
         
-        # --- LOS NUEVOS CAMBIOS ESTRELLA ---
         st.divider()
         st.write("📌 **Estatus y Documentación**")
         estatus = st.selectbox("Estatus de la SOLPED", ["En Proceso", "Adjudicado", "Cancelado"])
@@ -56,26 +42,28 @@ if menu == "Registrar Nueva SOLPED":
             if numero == "":
                 st.warning("⚠️ Por favor, ingresa el Número de SOLPED.")
             else:
-                try:
-                    # Simulamos que leemos el PDF para el demo
-                    estado_archivos = "Sin archivos"
-                    if archivo_solped or archivo_contrato:
-                        estado_archivos = "📁 Expedientes cargados"
+                # AGREGAMOS EL SPINNER DE CARGA VISUAL
+                with st.spinner('Procesando documentos y guardando en base de datos...'):
+                    try:
+                        # Simulamos que leemos el PDF por ahora
+                        estado_archivos = "Sin archivos"
+                        if archivo_solped or archivo_contrato:
+                            estado_archivos = "📁 Expedientes cargados"
+                            
+                        conexion = sqlite3.connect('solped_data.db')
+                        cursor = conexion.cursor()
+                        cursor.execute('''
+                            INSERT INTO solicitudes_solped (numero_solped, area_usuaria, coordinacion_asignada, estatus, link_pdf)
+                            VALUES (?, ?, ?, ?, ?)
+                        ''', (numero, area, coordinacion, estatus, estado_archivos))
+                        conexion.commit()
+                        conexion.close()
+                        st.success(f"✅ ¡Éxito! La SOLPED {numero} quedó guardada.")
+                    except sqlite3.IntegrityError:
+                        st.error(f"❌ Error: La SOLPED {numero} ya está registrada en el sistema.")
+                    except Exception as e:
+                        st.error(f"Ocurrió un error: {e}")
                         
-                    conexion = sqlite3.connect('solped_data.db')
-                    cursor = conexion.cursor()
-                    cursor.execute('''
-                        INSERT INTO solicitudes_solped (numero_solped, area_usuaria, coordinacion_asignada, estatus, link_pdf)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (numero, area, coordinacion, estatus, estado_archivos))
-                    conexion.commit()
-                    conexion.close()
-                    st.success(f"✅ ¡Éxito! La SOLPED {numero} quedó como '{estatus}' y sus documentos fueron procesados.")
-                except sqlite3.IntegrityError:
-                    st.error(f"❌ Error: La SOLPED {numero} ya está registrada en el sistema.")
-                except Exception as e:
-                    st.error(f"Ocurrió un error: {e}")
-
 # ---------------------------------------------------------
 # PANTALLA 2: AGREGAR LOS "MIL CÓDIGOS"
 # ---------------------------------------------------------
