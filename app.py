@@ -66,7 +66,7 @@ if menu == "Registrar Nueva SOLPED":
                         # Insertamos los datos en la tabla que creaste
                         respuesta = supabase.table("solicitudes_solped").insert(datos).execute()
                         
-                        st.success(f"✅ ¡Éxito! La SOLPED {numero} quedó guardada permanentemente en la nube.")
+                        st.success(f"✅ Guardado con éxito. La SOLPED {numero} fue registrada correctamente.")
                         
                     except Exception as e:
                         # Supabase devuelve un error específico si el número ya existe (Unique violation)
