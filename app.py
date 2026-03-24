@@ -63,8 +63,13 @@ def init_connection():
 supabase = init_connection()
 
 # --- MENÚ DE NAVEGACIÓN INSTITUCIONAL ---
-# Logo oficial desde Wikimedia (No se rompe)
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Metro_de_la_Ciudad_de_M%C3%A9xico.svg/512px-Metro_de_la_Ciudad_de_M%C3%A9xico.svg.png", width=140) 
+# Logo forzado por HTML para que no se rompa nunca
+st.sidebar.markdown("""
+<div style="text-align: center; margin-bottom: 20px;">
+    <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Metro_de_la_Ciudad_de_M%C3%A9xico.svg/200px-Metro_de_la_Ciudad_de_M%C3%A9xico.svg.png" width="120">
+</div>
+""", unsafe_allow_html=True)
+
 st.sidebar.title("Gerencia de Compras")
 menu = st.sidebar.radio(
     "Navegación del Sistema:",
@@ -84,17 +89,20 @@ if menu == "📊 Dashboard Gerencial":
         if df.empty:
             st.info("No hay datos para mostrar en la base de datos.")
         else:
-            # EXTRACCIÓN FORZADA DE FECHAS (Adiós al error de años perdidos)
-            df['fecha_str'] = df['fecha_oficio'].astype(str).str.strip()
-            df['fecha_limpia'] = pd.to_datetime(df['fecha_str'], dayfirst=True, errors='coerce')
+            # EXTRACCIÓN SÚPER SEGURA DE FECHAS (El escudo protector)
+            df['fecha_oficio'] = df['fecha_oficio'].astype(str)
+            df['fecha_limpia'] = pd.to_datetime(df['fecha_oficio'], errors='coerce')
             
             # Filtros en la barra lateral
             st.sidebar.markdown("---")
             st.sidebar.subheader("📅 Filtros de Consulta")
             
-            # Sacamos los años a la fuerza
-            años_validos = df['fecha_limpia'].dt.year.dropna().astype(int).unique().tolist()
-            años_validos.sort(reverse=True)
+            # Verificamos si logramos convertir fechas antes de sacar los años
+            if pd.api.types.is_datetime64_any_dtype(df['fecha_limpia']) and not df['fecha_limpia'].isna().all():
+                años_validos = df['fecha_limpia'].dt.year.dropna().astype(int).unique().tolist()
+                años_validos.sort(reverse=True)
+            else:
+                años_validos = []
                 
             meses_nombres = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 
                              7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
@@ -108,7 +116,9 @@ if menu == "📊 Dashboard Gerencial":
                 df_filtrado = df_filtrado[df_filtrado['fecha_limpia'].dt.year == int(f_año)]
             if f_mes != "Todos":
                 num_mes = [k for k, v in meses_nombres.items() if v == f_mes][0]
-                df_filtrado = df_filtrado[df_filtrado['fecha_limpia'].dt.month == num_mes]
+                # Verificación extra antes de filtrar por mes
+                if pd.api.types.is_datetime64_any_dtype(df_filtrado['fecha_limpia']):
+                    df_filtrado = df_filtrado[df_filtrado['fecha_limpia'].dt.month == num_mes]
 
             # Convertir monto a numérico de forma segura
             df_filtrado['monto'] = pd.to_numeric(df_filtrado['monto'], errors='coerce').fillna(0)
@@ -145,7 +155,7 @@ if menu == "📊 Dashboard Gerencial":
                          use_container_width=True)
             
     except Exception as e:
-        st.error(f"Error de conexión: {e}")
+        st.error(f"Error de conexión o datos: {e}")
 
 # ==========================================
 # PANTALLA 2: REGISTRAR SOLPED
