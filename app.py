@@ -17,7 +17,7 @@ def init_connection():
 supabase = init_connection()
 
 # --- MENÚ DE NAVEGACIÓN ---
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3135/3135679.png", width=100) # Un loguito coqueto
+st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Metro_de_la_Ciudad_de_M%C3%A9xico.svg/512px-Metro_de_la_Ciudad_de_M%C3%A9xico.svg.png", width=120)
 st.sidebar.title("Menú Principal")
 menu = st.sidebar.radio(
     "Navegación:",
