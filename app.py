@@ -1,227 +1,220 @@
 import streamlit as st
-import sqlite3
 import pandas as pd
-from config import LISTA_AREAS
-from supabase import create_client, Client
+from supabase import create_client
 
-# --- CONEXIÓN A LA BÓVEDA DE SUPABASE ---
-url_bd = st.secrets["SUPABASE_URL"]
-llave_bd = st.secrets["SUPABASE_KEY"]
-supabase: Client = create_client(url_bd, llave_bd)
-# ----------------------------------------
+# --- CONFIGURACIÓN DE LA APP ---
+st.set_page_config(page_title="Sistema SOLPED", page_icon="📊", layout="wide")
 
-# Configuración de la página
-st.set_page_config(page_title="Sistema SOLPED", page_icon="📊", layout="centered")
+# --- CONEXIÓN A LA NUBE (SUPABASE) ---
+# Llaves inyectadas listas para funcionar
+SUPABASE_URL = "https://emickgfmgyzkabmxbmqn.supabase.co"
+SUPABASE_KEY = "sb_publishable_WvpRWnDzmRJ-mmrZedWrTA_agKAp_Kg"
 
-st.title("📊 Gestor de SOLPEDs")
-st.write("Bienvenido al sistema automatizado de compras y requisiciones.")
+@st.cache_resource
+def init_connection():
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
 
-menu = st.sidebar.selectbox(
-    "Menú de Opciones",
-    ("Registrar Nueva SOLPED", "Agregar Códigos a SOLPED", "Buscar SOLPED", "Ver Dashboard (Gerencia)")
+supabase = init_connection()
+
+# --- MENÚ DE NAVEGACIÓN ---
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3135/3135679.png", width=100) # Un loguito coqueto
+st.sidebar.title("Menú Principal")
+menu = st.sidebar.radio(
+    "Navegación:",
+    ("📊 Dashboard Gerencial", "📝 Registrar SOLPED", "🛒 Agregar Artículos", "🔍 Buscar SOLPED")
 )
 
-# ---------------------------------------------------------
-# PANTALLA 1: REGISTRAR DATOS GENERALES
-# ---------------------------------------------------------
-if menu == "Registrar Nueva SOLPED":
-    st.subheader("📝 Registrar Nueva Solicitud (Fase 2)")
+# ==========================================
+# PANTALLA 1: DASHBOARD GERENCIAL
+# ==========================================
+if menu == "📊 Dashboard Gerencial":
+    st.title("📈 Panel de Control Gerencial")
     
-    with st.form("form_registro", clear_on_submit=True):
-        # --- SECCIÓN 1: DATOS GENERALES ---
-        st.write("📌 **Datos Generales**")
-        col1, col2 = st.columns(2) # Partimos la pantalla en 2
+    # Descargar datos de la nube
+    try:
+        res_solpeds = supabase.table("solicitudes_solped").select("*").execute()
+        df = pd.DataFrame(res_solpeds.data)
         
-        with col1:
-            numero = st.text_input("Número de SOLPED (Obligatorio)*")
-            fecha_oficio = st.text_input("Fecha Oficio (ej. 01-08-25)")
-            oficio = st.text_input("Oficio")
+        if df.empty:
+            st.info("No hay datos para mostrar todavía.")
+        else:
+            # Limpieza de fechas para evitar el error de Pandas
+            df['fecha_limpia'] = pd.to_datetime(df['fecha_oficio'], errors='coerce')
             
-        with col2:
-            area = st.selectbox("Área Usuaria", LISTA_AREAS)
-            coordinacion = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
-        
-        # --- SECCIÓN 2: DETALLES DE LA COMPRA ---
-        st.divider()
-        st.write("🛒 **Detalles de la Compra**")
-        descripcion = st.text_area("Descripción de la SOLPED")
-        
-        col3, col4 = st.columns(2)
-        with col3:
-            no_partidas = st.number_input("No. Partidas", min_value=0, step=1)
-            suficiencia_01 = st.text_input("Suficiencia 01")
-            procedimiento = st.text_input("Procedimiento")
+            # Filtros
+            st.sidebar.markdown("---")
+            st.sidebar.subheader("📅 Filtros")
             
-        with col4:
-            monto = st.number_input("Monto Estimado ($)", min_value=0.0, step=100.0)
-            suficiencia_02 = st.text_input("Suficiencia 02")
-            fecha_recibido = st.text_input("Fecha de Recibido en Área Operadora")
+            # Obtener años válidos
+            if pd.api.types.is_datetime64_any_dtype(df['fecha_limpia']):
+                años_disp = df['fecha_limpia'].dt.year.dropna().unique()
+                años = sorted(años_disp.astype(int), reverse=True)
+            else:
+                años = []
+                
+            meses_nombres = {1:"Enero", 2:"Febrero", 3:"Marzo", 4:"Abril", 5:"Mayo", 6:"Junio", 
+                             7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
+            
+            f_año = st.sidebar.selectbox("Año", ["Todos"] + list(años))
+            f_mes = st.sidebar.selectbox("Mes", ["Todos"] + list(meses_nombres.values()))
+            
+            # Aplicar Filtros
+            df_filtrado = df.copy()
+            if f_año != "Todos" and años:
+                df_filtrado = df_filtrado[df_filtrado['fecha_limpia'].dt.year == int(f_año)]
+            if f_mes != "Todos":
+                num_mes = [k for k, v in meses_nombres.items() if v == f_mes][0]
+                if pd.api.types.is_datetime64_any_dtype(df_filtrado['fecha_limpia']):
+                    df_filtrado = df_filtrado[df_filtrado['fecha_limpia'].dt.month == num_mes]
 
-        # --- SECCIÓN 3: CONTRATO Y ESTATUS ---
-        st.divider()
-        st.write("📋 **Contrato y Estatus**")
-        col5, col6 = st.columns(2)
-        
-        with col5:
-            contrato = st.text_input("Número de Contrato")
-            estatus = st.selectbox("Estatus de la SOLPED", ["En Proceso", "Adjudicado", "Cancelado"])
+            # Convertir monto a numérico por si acaso
+            df_filtrado['monto'] = pd.to_numeric(df_filtrado['monto'], errors='coerce').fillna(0)
+
+            # Tarjetas de Resumen
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Total de SOLPEDs", len(df_filtrado))
+            col2.metric("Monto Total", f"${df_filtrado['monto'].sum():,.2f}")
+            promedio = df_filtrado['monto'].mean() if len(df_filtrado) > 0 else 0
+            col3.metric("Promedio Invertido", f"${promedio:,.2f}")
             
-        with col6:
-            monto_contrato = st.number_input("Monto de Contrato ($)", min_value=0.0, step=100.0)
+            st.divider()
+            
+            # Gráficas
+            colA, colB = st.columns(2)
+            with colA:
+                st.write("**Gasto por Área Usuaria**")
+                st.bar_chart(df_filtrado.groupby('area_usuaria')['monto'].sum())
+            with colB:
+                st.write("**Estatus de SOLPEDs**")
+                if 'estatus' in df_filtrado.columns:
+                    st.bar_chart(df_filtrado['estatus'].value_counts())
+                else:
+                    st.info("Columna de estatus no disponible")
+            
+            # Tabla visible
+            st.subheader("📋 Detalles")
+            columnas_mostrar = ['numero_solped', 'area_usuaria', 'monto', 'fecha_oficio', 'link_pdf']
+            # Filtramos solo las columnas que existen
+            columnas_reales = [col for col in columnas_mostrar if col in df_filtrado.columns]
+            st.dataframe(df_filtrado[columnas_reales], use_container_width=True)
+            
+    except Exception as e:
+        st.error(f"Error cargando el Dashboard: {e}")
+
+# ==========================================
+# PANTALLA 2: REGISTRAR SOLPED
+# ==========================================
+elif menu == "📝 Registrar SOLPED":
+    st.title("📝 Nueva Solicitud (Directo a la Nube)")
+    
+    with st.form("form_nube"):
+        col1, col2 = st.columns(2)
+        with col1:
+            numero = st.text_input("Número de SOLPED (Oficio) *")
+            area = st.selectbox("Área Usuaria", [
+                "DIRECCIÓN GENERAL DE OPERACIÓN", "CAPITAL HUMANO", 
+                "DIRECCIÓN DE INSTALACIONES FIJAS", "OTRO"
+            ])
+            fecha = st.date_input("Fecha del Oficio")
+            monto = st.number_input("Monto Estimado General ($)", min_value=0.0)
+        with col2:
+            coord = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
+            link_pdf = st.text_input("Link del PDF (Google Drive)")
+            estatus = st.selectbox("Estatus Inicial", ["EN PROCESO", "COMPLETADA", "CANCELADA"])
         
-        # --- SECCIÓN 4: DOCUMENTOS ---
-        st.write("📂 **Documentación (Opcional)**")
-        archivo_solped = st.file_uploader("📥 Subir SOLPED escaneada (PDF)", type=["pdf"])
-        archivo_contrato = st.file_uploader("📥 Subir Contrato (PDF)", type=["pdf"])
+        desc = st.text_area("Descripción Breve")
+        enviado = st.form_submit_button("🚀 Guardar SOLPED")
         
-        st.divider()
-        enviado = st.form_submit_button("Guardar SOLPED Completa")
-        
-        # --- LÓGICA DE GUARDADO EN LA BÓVEDA ---
         if enviado:
             if numero == "":
-                st.warning("⚠️ Por favor, ingresa el Número de SOLPED.")
+                st.error("❌ El número de SOLPED es obligatorio.")
             else:
-                with st.spinner('Procesando datos y guardando...'):
-                    try:
-                        estado_archivos = "Sin archivos"
-                        if archivo_solped or archivo_contrato:
-                            estado_archivos = "📁 Expedientes cargados"
-                            
-                        # Empacamos TODOS los datos nuevos
-                        datos = {
-                            "numero_solped": numero,
-                            "area_usuaria": area,
-                            "coordinacion_asignada": coordinacion,
-                            "estatus": estatus,
-                            "link_pdf": estado_archivos,
-                            "no_partidas": no_partidas,
-                            "monto": monto,
-                            "fecha_oficio": fecha_oficio,
-                            "oficio": oficio,
-                            "descripcion": descripcion,
-                            "suficiencia_01": suficiencia_01,
-                            "suficiencia_02": suficiencia_02,
-                            "procedimiento": procedimiento,
-                            "fecha_recibido": fecha_recibido,
-                            "contrato": contrato,
-                            "monto_contrato": monto_contrato
+                nuevo_registro = {
+                    "numero_solped": numero,
+                    "area_usuaria": area,
+                    "coordinacion_asignada": coord,
+                    "monto": monto,
+                    "fecha_oficio": str(fecha),
+                    "link_pdf": link_pdf,
+                    "descripcion": desc,
+                    "estatus": estatus
+                }
+                try:
+                    supabase.table("solicitudes_solped").insert(nuevo_registro).execute()
+                    st.success(f"✅ ¡SOLPED {numero} guardada exitosamente en la nube!")
+                except Exception as e:
+                    st.error(f"Error al guardar: {e}")
+
+# ==========================================
+# PANTALLA 3: AGREGAR ARTÍCULOS (PARTIDAS)
+# ==========================================
+elif menu == "🛒 Agregar Artículos":
+    st.title("🛒 Catálogo de Artículos por SOLPED")
+    st.info("Selecciona una SOLPED existente para agregarle conceptos o partidas.")
+    
+    try:
+        # Traer las solpeds para el selector
+        res_solpeds = supabase.table("solicitudes_solped").select("id, numero_solped").execute()
+        if not res_solpeds.data:
+            st.warning("No hay SOLPEDs registradas para agregarles artículos.")
+        else:
+            opciones = {f"Oficio: {s['numero_solped']}": s['id'] for s in res_solpeds.data}
+            
+            with st.form("form_articulos"):
+                seleccion = st.selectbox("Asignar a SOLPED:", list(opciones.keys()))
+                codigo = st.text_input("Código del Artículo *")
+                desc_art = st.text_input("Descripción del Artículo")
+                monto_art = st.number_input("Costo de esta partida ($)", min_value=0.0)
+                
+                guardar_art = st.form_submit_button("➕ Agregar Artículo")
+                
+                if guardar_art:
+                    if codigo == "":
+                        st.error("El código es obligatorio.")
+                    else:
+                        id_solped = opciones[seleccion]
+                        nuevo_art = {
+                            "solped_id": id_solped,
+                            "codigo_articulo": codigo,
+                            "descripcion": desc_art,
+                            "monto": monto_art
                         }
-                        
-                        # Inyectamos en Supabase
-                        respuesta = supabase.table("solicitudes_solped").insert(datos).execute()
-                        st.success(f"✅ Guardado con éxito. La SOLPED {numero} fue registrada correctamente con todos sus detalles.")
-                        
-                    except Exception as e:
-                        if 'duplicate' in str(e).lower() or 'unique' in str(e).lower():
-                            st.error(f"❌ Error: La SOLPED {numero} ya está registrada en el sistema.")
-                        else:
-                            st.error(f"Ocurrió un error en la conexión: {e}")
-                        
-# ---------------------------------------------------------
-# PANTALLA 2: AGREGAR LOS "MIL CÓDIGOS"
-# ---------------------------------------------------------
-elif menu == "Agregar Códigos a SOLPED":
-    st.subheader("🛒 Agregar Artículos a una SOLPED")
-    conexion = sqlite3.connect('solped_data.db')
-    cursor = conexion.cursor()
-    cursor.execute("SELECT id, numero_solped FROM solicitudes_solped")
-    solpeds_guardadas = cursor.fetchall()
-    
-    if len(solpeds_guardadas) == 0:
-        st.warning("⚠️ No hay SOLPEDs registradas aún.")
-    else:
-        opciones_solped = {f"SOLPED: {s[1]}": s[0] for s in solpeds_guardadas}
-        with st.form("form_codigos"):
-            solped_seleccionada = st.selectbox("Selecciona la SOLPED", list(opciones_solped.keys()))
-            codigo = st.text_input("Código del Artículo")
-            descripcion = st.text_input("Descripción del artículo")
-            monto = st.number_input("Monto ($)", min_value=0.0, format="%.2f")
-            btn_guardar_codigo = st.form_submit_button("Guardar Código")
-            
-            if btn_guardar_codigo:
-                if codigo == "":
-                    st.error("❌ El código no puede estar vacío.")
-                else:
-                    solped_id = opciones_solped[solped_seleccionada]
-                    cursor.execute('''
-                        INSERT INTO partidas_codigos (solped_id, codigo_articulo, descripcion, monto)
-                        VALUES (?, ?, ?, ?)
-                    ''', (solped_id, codigo, descripcion, monto))
-                    conexion.commit()
-                    st.success(f"✅ ¡Código {codigo} agregado exitosamente a la {solped_seleccionada}!")
-    conexion.close()
+                        supabase.table("partidas_codigos").insert(nuevo_art).execute()
+                        st.success(f"✅ Artículo {codigo} agregado a {seleccion}")
+    except Exception as e:
+        st.error(f"Error: Asegúrate de tener la tabla 'partidas_codigos' en Supabase. Detalles: {e}")
 
-# ---------------------------------------------------------
-# PANTALLA 3: BUSCAR SOLPED (¡NUEVA!)
-# ---------------------------------------------------------
-elif menu == "Buscar SOLPED":
-    st.subheader("🔍 Buscar y Consultar SOLPED")
-    numero_buscar = st.text_input("Ingresa el Número de Oficio exacto para buscar:")
+# ==========================================
+# PANTALLA 4: BUSCAR SOLPED Y VER PDF
+# ==========================================
+elif menu == "🔍 Buscar SOLPED":
+    st.title("🔍 Buscador de Documentos")
     
+    busqueda = st.text_input("Ingresa el Número de Oficio a buscar:")
     if st.button("Buscar"):
-        if numero_buscar != "":
-            conexion = sqlite3.connect('solped_data.db')
-            # Buscamos la SOLPED general
-            query_solped = "SELECT * FROM solicitudes_solped WHERE numero_solped = ?"
-            df_solped = pd.read_sql_query(query_solped, conexion, params=(numero_buscar,))
-            
-            if df_solped.empty:
-                st.error(f"❌ No se encontró ninguna SOLPED con el número '{numero_buscar}'.")
-            else:
-                st.success("✅ SOLPED Encontrada")
-                st.write("**Datos Generales:**")
-                st.dataframe(df_solped.drop(columns=['id']), use_container_width=True)
-                
-                # Buscamos los artículos relacionados a esa SOLPED
-                solped_id = df_solped.iloc[0]['id']
-                query_articulos = "SELECT codigo_articulo as Código, descripcion as Descripción, monto as Monto FROM partidas_codigos WHERE solped_id = ?"
-                df_articulos = pd.read_sql_query(query_articulos, conexion, params=(int(solped_id),))
-                
-                st.write("**Artículos Registrados:**")
-                if df_articulos.empty:
-                    st.info("Esta SOLPED aún no tiene artículos registrados.")
-                else:
-                    st.dataframe(df_articulos, use_container_width=True)
-                    st.write(f"**Total de la SOLPED:** ${df_articulos['Monto'].sum():,.2f}")
+        if busqueda:
+            try:
+                res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", busqueda).execute()
+                if res.data:
+                    datos = res.data[0]
+                    st.success("✅ Documento Encontrado")
                     
-            conexion.close()
-
-# ---------------------------------------------------------
-# PANTALLA 4: DASHBOARD (PANEL GERENCIAL)
-# ---------------------------------------------------------
-elif menu == "Ver Dashboard (Gerencia)":
-    st.subheader("📈 Panel de Control Gerencial")
-    conexion = sqlite3.connect('solped_data.db')
-    df_solpeds = pd.read_sql_query("SELECT * FROM solicitudes_solped", conexion)
-    df_articulos = pd.read_sql_query("SELECT * FROM partidas_codigos", conexion)
-    
-    if df_solpeds.empty:
-        st.info("Aún no hay datos para mostrar en el Dashboard.")
-    else:
-        st.markdown("### 📊 Resumen General")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total de SOLPEDs", len(df_solpeds))
-        col2.metric("Artículos Capturados", len(df_articulos))
-        col3.metric("Monto Total Invertido", f"${df_articulos['monto'].sum() if not df_articulos.empty else 0:,.2f}")
-        
-        st.divider()
-        st.markdown("### 🎯 Análisis de Coordinaciones y Estatus")
-        colA, colB = st.columns(2)
-        with colA:
-            st.write("**Carga de trabajo por Coordinación**")
-            st.bar_chart(df_solpeds['coordinacion_asignada'].value_counts())
-        with colB:
-            st.write("**Estatus de las SOLPEDs**")
-            st.bar_chart(df_solpeds['estatus'].value_counts())
-        
-        st.divider()
-        st.markdown("### 📋 Base de Datos Maestra")
-        query_union = '''
-            SELECT s.numero_solped as "Oficio SOLPED", s.area_usuaria as "Área", 
-                   s.coordinacion_asignada as "Coordinación", s.estatus as "Estatus",
-                   p.codigo_articulo as "Código", p.descripcion as "Descripción", p.monto as "Monto"
-            FROM solicitudes_solped s LEFT JOIN partidas_codigos p ON s.id = p.solped_id
-        '''
-        st.dataframe(pd.read_sql_query(query_union, conexion), use_container_width=True)
-    conexion.close()
+                    colA, colB = st.columns(2)
+                    with colA:
+                        st.write(f"**Área Usuaria:** {datos.get('area_usuaria', 'N/A')}")
+                        st.write(f"**Coordinación:** {datos.get('coordinacion_asignada', 'N/A')}")
+                        st.write(f"**Monto:** ${datos.get('monto', 0):,.2f}")
+                    with colB:
+                        st.write(f"**Estatus:** {datos.get('estatus', 'N/A')}")
+                        st.write(f"**Fecha:** {datos.get('fecha_oficio', 'N/A')}")
+                        
+                        # EL BOTÓN MÁGICO PARA EL PDF
+                        link = datos.get('link_pdf', '')
+                        if link and link.startswith("http"):
+                            st.link_button("📂 Abrir PDF en Google Drive", link)
+                        else:
+                            st.info("Esta SOLPED no tiene un link de PDF válido registrado.")
+                else:
+                    st.error("❌ No se encontró la SOLPED.")
+            except Exception as e:
+                st.error(f"Error en la búsqueda: {e}")
