@@ -12,9 +12,6 @@ supabase: Client = create_client(url_bd, llave_bd)
 # Configuración de la página
 st.set_page_config(page_title="Sistema SOLPED", page_icon="📊", layout="centered")
 
-# Configuración de la página
-st.set_page_config(page_title="Sistema SOLPED", page_icon="📊", layout="centered")
-
 st.title("📊 Gestor de SOLPEDs")
 st.write("Bienvenido al sistema automatizado de compras y requisiciones.")
 
