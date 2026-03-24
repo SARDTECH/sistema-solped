@@ -17,7 +17,7 @@ def init_connection():
 supabase = init_connection()
 
 # --- MENÚ DE NAVEGACIÓN ---
-st.sidebar.image("https://upload.wikimedia.org/wikipedia/commons/thumb/1/15/Metro_de_la_Ciudad_de_M%C3%A9xico.svg/512px-Metro_de_la_Ciudad_de_M%C3%A9xico.svg.png", width=120)
+st.sidebar.image("https://logodownload.org/wp-content/uploads/2021/11/metro-cdmx-logo-0.png", width=120)
 st.sidebar.title("Menú Principal")
 menu = st.sidebar.radio(
     "Navegación:",
