@@ -36,11 +36,11 @@ def init_connection():
 supabase = init_connection()
 
 # --- MENÚ DE NAVEGACIÓN ---
-# Ahora lee el logo directamente desde tu GitHub (Garantizado que no se rompe)
+# ¡Aquí está el arreglo del logo! Lee el nombre exacto de tu GitHub
 try:
-    st.sidebar.image("logo.png", width=150)
+    st.sidebar.image("logo m.png", width=150)
 except:
-    st.sidebar.markdown("*(Sube tu archivo logo.png a GitHub)*")
+    pass # Si no lo encuentra, no pone mensaje de error, solo se lo salta
 
 st.sidebar.title("Gerencia de Compras")
 menu = st.sidebar.radio(
@@ -54,7 +54,6 @@ menu = st.sidebar.radio(
 def extraer_año_seguro(fecha_str):
     try:
         if pd.isna(fecha_str) or str(fecha_str).strip() == "": return None
-        # Busca un número de 4 dígitos o de 2 dígitos al final (ej. 25 -> 2025)
         partes = str(fecha_str).replace('/', '-').split('-')
         if len(partes) == 3:
             year = partes[2].strip()
@@ -85,11 +84,9 @@ if menu == "📊 Dashboard Gerencial":
         if df.empty:
             st.info("No hay datos para mostrar en la base de datos.")
         else:
-            # EXTRAER FECHAS A LA FUERZA
             df['año_real'] = df['fecha_oficio'].apply(extraer_año_seguro)
             df['mes_real'] = df['fecha_oficio'].apply(extraer_mes_seguro)
             
-            # Sacamos años válidos (ignorando nulos)
             años_lista = df['año_real'].dropna().astype(int).unique().tolist()
             años_lista.sort(reverse=True)
             
@@ -101,7 +98,6 @@ if menu == "📊 Dashboard Gerencial":
                              7:"Julio", 8:"Agosto", 9:"Septiembre", 10:"Octubre", 11:"Noviembre", 12:"Diciembre"}
             f_mes = st.sidebar.selectbox("Seleccionar Mes", ["Todos"] + list(meses_nombres.values()))
             
-            # FILTRADO INFALIBLE
             df_filtrado = df.copy()
             if f_año != "Todos":
                 df_filtrado = df_filtrado[df_filtrado['año_real'] == int(f_año)]
@@ -111,14 +107,12 @@ if menu == "📊 Dashboard Gerencial":
 
             df_filtrado['monto'] = pd.to_numeric(df_filtrado['monto'], errors='coerce').fillna(0)
 
-            # Tarjetas
             col1, col2, col3 = st.columns(3)
             col1.metric("Total de SOLPEDs", len(df_filtrado))
             col2.metric("Monto Total Invertido", f"${df_filtrado['monto'].sum():,.2f}")
             col3.metric("Promedio por Oficio", f"${(df_filtrado['monto'].mean() if len(df_filtrado)>0 else 0):,.2f}")
             st.divider()
             
-            # Gráficas
             colA, colB = st.columns(2)
             with colA:
                 st.write("**Gasto por Área Usuaria**")
@@ -127,7 +121,6 @@ if menu == "📊 Dashboard Gerencial":
                 st.write("**Estatus de SOLPEDs**")
                 if 'estatus' in df_filtrado.columns: st.bar_chart(df_filtrado['estatus'].value_counts())
             
-            # Tabla
             st.subheader("📋 Base de Datos Filtrada")
             cols_mostrar = ['numero_solped', 'area_usuaria', 'monto', 'fecha_oficio', 'estatus', 'link_pdf']
             cols_reales = [c for c in cols_mostrar if c in df_filtrado.columns]
@@ -181,55 +174,60 @@ elif menu == "🛒 Agregar Artículos":
     except Exception as e: st.error(f"Error: {e}")
 
 # ==========================================
-# PANTALLA 4: BUSCAR Y EDITAR (¡LA MAGIA NUEVA!)
+# PANTALLA 4: BUSCAR Y EDITAR (CON BOTÓN)
 # ==========================================
 elif menu == "🔍 Buscar y Editar":
     st.title("🔍 Localizador y Edición de Documentos")
-    busqueda = st.text_input("Ingrese el Número exacto de SOLPED:")
     
-    if busqueda:
-        res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", busqueda).execute()
-        if res.data:
-            datos = res.data[0]
-            st.success("✅ Expediente Localizado")
-            
-            # --- TABS: VER vs EDITAR ---
-            tab1, tab2 = st.tabs(["📄 Ver Detalles", "⚙️ Editar Documento"])
-            
-            with tab1:
-                colA, colB = st.columns(2)
-                with colA:
-                    st.write(f"**Área Responsable:** {datos.get('area_usuaria', 'N/A')}")
-                    st.write(f"**Coordinación:** {datos.get('coordinacion_asignada', 'N/A')}")
-                    st.write(f"**Monto:** ${datos.get('monto', 0):,.2f}")
-                with colB:
-                    st.write(f"**Estatus:** {datos.get('estatus', 'N/A')}")
-                    st.write(f"**Fecha Registro:** {datos.get('fecha_oficio', 'N/A')}")
-                    link = datos.get('link_pdf', '')
-                    if link and link.startswith("http"):
-                        st.link_button("📂 Consultar Expediente PDF", link)
-                    else:
-                        st.info("Sin expediente digital anexado.")
-            
-            with tab2:
-                st.info("Actualiza los datos de la SOLPED aquí mismo.")
-                with st.form("form_editar"):
-                    # Detectar el índice actual del estatus
-                    lista_estatus = ["EN PROCESO", "COMPLETADA", "CANCELADA"]
-                    estatus_actual = datos.get('estatus', 'EN PROCESO')
-                    idx_estatus = lista_estatus.index(estatus_actual) if estatus_actual in lista_estatus else 0
-                    
-                    nuevo_estatus = st.selectbox("Actualizar Estatus", lista_estatus, index=idx_estatus)
-                    nuevo_link = st.text_input("Actualizar Enlace PDF (Drive)", value=datos.get('link_pdf', ''))
-                    nuevo_monto = st.number_input("Corregir Monto ($)", value=float(datos.get('monto', 0)), min_value=0.0)
-                    
-                    if st.form_submit_button("💾 Guardar Cambios"):
-                        supabase.table("solicitudes_solped").update({
-                            "estatus": nuevo_estatus,
-                            "link_pdf": nuevo_link,
-                            "monto": nuevo_monto
-                        }).eq("id", datos['id']).execute()
-                        st.success("✅ ¡Actualización exitosa! Vuelve a buscar el número para ver los cambios.")
+    # --- FORMULARIO DE BÚSQUEDA ---
+    with st.form("form_buscar"):
+        busqueda = st.text_input("Ingrese el Número exacto de SOLPED:")
+        boton_buscar = st.form_submit_button("🔍 Buscar SOLPED")
+    
+    if boton_buscar:
+        if busqueda:
+            res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", busqueda).execute()
+            if res.data:
+                datos = res.data[0]
+                st.success("✅ Expediente Localizado")
+                
+                tab1, tab2 = st.tabs(["📄 Ver Detalles", "⚙️ Editar Documento"])
+                
+                with tab1:
+                    colA, colB = st.columns(2)
+                    with colA:
+                        st.write(f"**Área Responsable:** {datos.get('area_usuaria', 'N/A')}")
+                        st.write(f"**Coordinación:** {datos.get('coordinacion_asignada', 'N/A')}")
+                        st.write(f"**Monto:** ${datos.get('monto', 0):,.2f}")
+                    with colB:
+                        st.write(f"**Estatus:** {datos.get('estatus', 'N/A')}")
+                        st.write(f"**Fecha Registro:** {datos.get('fecha_oficio', 'N/A')}")
+                        link = datos.get('link_pdf', '')
+                        if link and link.startswith("http"):
+                            st.link_button("📂 Consultar Expediente PDF", link)
+                        else:
+                            st.info("Sin expediente digital anexado.")
+                
+                with tab2:
+                    st.info("Actualiza los datos de la SOLPED aquí mismo.")
+                    with st.form("form_editar"):
+                        lista_estatus = ["EN PROCESO", "COMPLETADA", "CANCELADA"]
+                        estatus_actual = datos.get('estatus', 'EN PROCESO')
+                        idx_estatus = lista_estatus.index(estatus_actual) if estatus_actual in lista_estatus else 0
                         
+                        nuevo_estatus = st.selectbox("Actualizar Estatus", lista_estatus, index=idx_estatus)
+                        nuevo_link = st.text_input("Actualizar Enlace PDF (Drive)", value=datos.get('link_pdf', ''))
+                        nuevo_monto = st.number_input("Corregir Monto ($)", value=float(datos.get('monto', 0)), min_value=0.0)
+                        
+                        if st.form_submit_button("💾 Guardar Cambios"):
+                            supabase.table("solicitudes_solped").update({
+                                "estatus": nuevo_estatus,
+                                "link_pdf": nuevo_link,
+                                "monto": nuevo_monto
+                            }).eq("id", datos['id']).execute()
+                            st.success("✅ ¡Actualización exitosa! Vuelve a buscar el número para ver los cambios.")
+                            
+            else:
+                st.error("❌ El número de SOLPED no existe en los registros.")
         else:
-            st.error("❌ El número de SOLPED no existe en los registros.")
+            st.warning("⚠️ Por favor ingresa un número de SOLPED para buscar.")
