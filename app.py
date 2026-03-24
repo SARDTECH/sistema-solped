@@ -3,7 +3,7 @@ import pandas as pd
 from supabase import create_client
 
 # --- CONFIGURACIÓN DE LA APP ---
-st.set_page_config(page_title="Sistema SOLPED", page_icon="📊", layout="wide")
+st.set_page_config(page_title="Sistema SOLPED - Metro CDMX", page_icon="🚇", layout="wide")
 
 # --- CONEXIÓN A LA NUBE (SUPABASE) ---
 # Llaves inyectadas listas para funcionar
