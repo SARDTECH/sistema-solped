@@ -177,18 +177,28 @@ elif menu == "🛒 Agregar Artículos":
     except Exception as e: st.error(f"Error: {e}")
 
 # ==========================================
-# PANTALLA 4: BUSCAR Y EDITAR (CORREGIDA)
+# PANTALLA 4: BUSCAR Y EDITAR (CON BOTÓN Y MEMORIA)
 # ==========================================
 elif menu == "🔍 Buscar y Editar":
     st.title("🔍 Localizador y Edición de Documentos")
     
-    # 1. Quitamos el botón de buscar para evitar el "efecto amnesia". 
-    # Ahora busca automáticamente al dar Enter.
-    st.info("💡 Escribe el número exacto de SOLPED y presiona **Enter** en tu teclado.")
-    busqueda = st.text_input("Número de SOLPED:")
-    
-    if busqueda:
-        res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", busqueda).execute()
+    # Creamos una "memoria" interna para que el sistema no olvide qué estamos editando
+    if 'busqueda_activa' not in st.session_state:
+        st.session_state.busqueda_activa = ""
+
+    # Acomodamos el buscador y el botón en la misma línea
+    col_input, col_btn = st.columns([3, 1])
+    with col_input:
+        busqueda_actual = st.text_input("Ingrese el Número exacto de SOLPED:")
+    with col_btn:
+        st.markdown("<br>", unsafe_allow_html=True) # Espacio para alinear el botón con el texto
+        if st.button("🔍 Buscar SOLPED", use_container_width=True):
+            st.session_state.busqueda_activa = busqueda_actual
+            
+    # Si hay una búsqueda guardada en la memoria, mostramos todo
+    if st.session_state.busqueda_activa:
+        res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", st.session_state.busqueda_activa).execute()
+        
         if res.data:
             datos = res.data[0]
             st.success("✅ Expediente Localizado")
@@ -229,10 +239,9 @@ elif menu == "🔍 Buscar y Editar":
                                 "monto": nuevo_monto
                             }).eq("id", datos['id']).execute()
                             
-                            st.success("✅ ¡Base de datos actualizada correctamente!")
-                            st.balloons() # Un toque visual para confirmar el guardado
+                            st.success("✅ ¡Base de datos actualizada correctamente! Los cambios ya están en la nube.")
+                            st.balloons() # Globos de celebración
                         except Exception as e:
                             st.error(f"Error al guardar: {e}")
-                        
         else:
             st.error("❌ El número de SOLPED no existe en los registros.")
