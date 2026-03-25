@@ -169,18 +169,39 @@ elif menu == "📝 Registrar SOLPED":
 elif menu == "🛒 Agregar Artículos":
     st.title("🛒 Catálogo de Partidas")
     try:
-        res_solpeds = supabase.table("solicitudes_solped").select("id, numero_solped").execute()
+        # CAMBIO: Ahora también traemos la columna 'coordinacion_asignada' de la nube
+        res_solpeds = supabase.table("solicitudes_solped").select("id, numero_solped, coordinacion_asignada").execute()
         if res_solpeds.data:
-            opciones = {str(s['numero_solped']): s['id'] for s in res_solpeds.data}
+            
+            # CAMBIO: Armamos el menú con el número + CCP/CCE + Ícono
+            opciones = {}
+            for s in res_solpeds.data:
+                coord = str(s.get('coordinacion_asignada', ''))
+                if "CCP" in coord:
+                    etiqueta = f"{s['numero_solped']} (🇲🇽 CCP)"
+                elif "CCE" in coord:
+                    etiqueta = f"{s['numero_solped']} (🌎 CCE)"
+                else:
+                    etiqueta = f"{s['numero_solped']}"
+                    
+                opciones[etiqueta] = s['id']
+                
             with st.form("form_articulos"):
                 seleccion = st.selectbox("Asignar a SOLPED:", list(opciones.keys()))
                 codigo = st.text_input("Código de Partida *")
                 desc_art = st.text_input("Descripción")
                 monto_art = st.number_input("Monto de Partida ($)", min_value=0.0)
+                
                 if st.form_submit_button("Guardar Partida") and codigo:
-                    supabase.table("partidas_codigos").insert({"solped_id": opciones[seleccion], "codigo_articulo": codigo, "descripcion": desc_art, "monto": monto_art}).execute()
-                    st.success(f"✅ Partida guardada en SOLPED {seleccion}")
-    except Exception as e: st.error(f"Error: {e}")
+                    supabase.table("partidas_codigos").insert({
+                        "solped_id": opciones[seleccion], 
+                        "codigo_articulo": codigo, 
+                        "descripcion": desc_art, 
+                        "monto": monto_art
+                    }).execute()
+                    st.success(f"✅ Partida guardada en el expediente: {seleccion}")
+    except Exception as e: 
+        st.error(f"Error: {e}")
 
 # ==========================================
 # PANTALLA 4: BUSCAR Y EDITAR (CON AUTO-RESETEO)
