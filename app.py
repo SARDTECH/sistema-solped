@@ -164,44 +164,50 @@ elif menu == "📝 Registrar SOLPED":
                 st.success(f"✅ SOLPED {numero} registrada.")
 
 # ==========================================
-# PANTALLA 3: AGREGAR ARTÍCULOS
+# PANTALLA 3: AGREGAR ARTÍCULOS (OPTIMIZADA)
 # ==========================================
 elif menu == "🛒 Agregar Artículos":
     st.title("🛒 Catálogo de Partidas")
     try:
-        # CAMBIO: Ahora también traemos la columna 'coordinacion_asignada' de la nube
-        res_solpeds = supabase.table("solicitudes_solped").select("id, numero_solped, coordinacion_asignada").execute()
+        res_solpeds = supabase.table("solicitudes_solped").select("id, numero_solped").execute()
         if res_solpeds.data:
+            opciones = {str(s['numero_solped']): s['id'] for s in res_solpeds.data}
             
-            # CAMBIO: Armamos el menú con el número + CCP/CCE + Ícono
-            opciones = {}
-            for s in res_solpeds.data:
-                coord = str(s.get('coordinacion_asignada', ''))
-                if "CCP" in coord:
-                    etiqueta = f"{s['numero_solped']} (🇲🇽 CCP)"
-                elif "CCE" in coord:
-                    etiqueta = f"{s['numero_solped']} (🌎 CCE)"
-                else:
-                    etiqueta = f"{s['numero_solped']}"
-                    
-                opciones[etiqueta] = s['id']
-                
             with st.form("form_articulos"):
-                seleccion = st.selectbox("Asignar a SOLPED:", list(opciones.keys()))
-                codigo = st.text_input("Código de Partida *")
-                desc_art = st.text_input("Descripción")
-                monto_art = st.number_input("Monto de Partida ($)", min_value=0.0)
+                # ACCIÓN C: Mantenemos el estándar UI de 2 columnas
+                col1, col2 = st.columns(2)
+                with col1:
+                    seleccion = st.selectbox("Asignar a SOLPED:", list(opciones.keys()))
+                    codigo = st.text_input("Código de Partida *")
+                    monto_art = st.number_input("Monto de Partida ($)", min_value=0.0)
+                with col2:
+                    coord = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
+                    desc_art = st.text_input("Descripción de la Partida")
                 
-                if st.form_submit_button("Guardar Partida") and codigo:
-                    supabase.table("partidas_codigos").insert({
-                        "solped_id": opciones[seleccion], 
-                        "codigo_articulo": codigo, 
-                        "descripcion": desc_art, 
-                        "monto": monto_art
-                    }).execute()
-                    st.success(f"✅ Partida guardada en el expediente: {seleccion}")
+                enviado = st.form_submit_button("Guardar Partida")
+                
+                if enviado:
+                    # ACCIÓN B: Validación estricta para que no viajen datos vacíos
+                    if not codigo.strip():
+                        st.error("❌ El Código de Partida es obligatorio.")
+                    else:
+                        # ACCIÓN B: Sanitización de datos (Forzar mayúsculas)
+                        codigo_limpio = codigo.strip().upper()
+                        
+                        # ACCIÓN B: Inserción limpia y directa (Adiós al try-except redundante)
+                        supabase.table("partidas_codigos").insert({
+                            "solped_id": opciones[seleccion], 
+                            "codigo_articulo": codigo_limpio, 
+                            "descripcion": desc_art, 
+                            "monto": monto_art,
+                            "coordinacion": coord # Insertando en la nueva columna
+                        }).execute()
+                        
+                        # Mensaje de éxito confirmando la coordinación (Criterio de Aceptación)
+                        st.success(f"✅ Partida {codigo_limpio} guardada exitosamente en SOLPED {seleccion} como {coord}")
+                        
     except Exception as e: 
-        st.error(f"Error: {e}")
+        st.error(f"Error de sistema: {e}")
 
 # ==========================================
 # PANTALLA 4: BUSCAR Y EDITAR (CON AUTO-RESETEO)
