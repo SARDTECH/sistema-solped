@@ -177,59 +177,62 @@ elif menu == "🛒 Agregar Artículos":
     except Exception as e: st.error(f"Error: {e}")
 
 # ==========================================
-# PANTALLA 4: BUSCAR Y EDITAR
+# PANTALLA 4: BUSCAR Y EDITAR (CORREGIDA)
 # ==========================================
 elif menu == "🔍 Buscar y Editar":
     st.title("🔍 Localizador y Edición de Documentos")
     
-    with st.form("form_buscar"):
-        busqueda = st.text_input("Ingrese el Número exacto de SOLPED:")
-        boton_buscar = st.form_submit_button("🔍 Buscar SOLPED")
+    # 1. Quitamos el botón de buscar para evitar el "efecto amnesia". 
+    # Ahora busca automáticamente al dar Enter.
+    st.info("💡 Escribe el número exacto de SOLPED y presiona **Enter** en tu teclado.")
+    busqueda = st.text_input("Número de SOLPED:")
     
-    if boton_buscar:
-        if busqueda:
-            res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", busqueda).execute()
-            if res.data:
-                datos = res.data[0]
-                st.success("✅ Expediente Localizado")
-                
-                tab1, tab2 = st.tabs(["📄 Ver Detalles", "⚙️ Editar Documento"])
-                
-                with tab1:
-                    colA, colB = st.columns(2)
-                    with colA:
-                        st.write(f"**Área Responsable:** {datos.get('area_usuaria', 'N/A')}")
-                        st.write(f"**Coordinación:** {datos.get('coordinacion_asignada', 'N/A')}")
-                        st.write(f"**Monto:** ${datos.get('monto', 0):,.2f}")
-                    with colB:
-                        st.write(f"**Estatus:** {datos.get('estatus', 'N/A')}")
-                        st.write(f"**Fecha Registro:** {datos.get('fecha_oficio', 'N/A')}")
-                        link = datos.get('link_pdf', '')
-                        if link and link.startswith("http"):
-                            st.link_button("📂 Abrir Carpeta del Expediente", link)
-                        else:
-                            st.info("Sin expediente digital anexado.")
-                
-                with tab2:
-                    st.info("Actualiza los datos de la SOLPED aquí mismo.")
-                    with st.form("form_editar"):
-                        lista_estatus = ["EN PROCESO", "COMPLETADA", "CANCELADA"]
-                        estatus_actual = datos.get('estatus', 'EN PROCESO')
-                        idx_estatus = lista_estatus.index(estatus_actual) if estatus_actual in lista_estatus else 0
-                        
-                        nuevo_estatus = st.selectbox("Actualizar Estatus", lista_estatus, index=idx_estatus)
-                        nuevo_link = st.text_input("Actualizar Enlace de la Carpeta", value=datos.get('link_pdf', ''))
-                        nuevo_monto = st.number_input("Corregir Monto ($)", value=float(datos.get('monto', 0)), min_value=0.0)
-                        
-                        if st.form_submit_button("💾 Guardar Cambios"):
+    if busqueda:
+        res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", busqueda).execute()
+        if res.data:
+            datos = res.data[0]
+            st.success("✅ Expediente Localizado")
+            
+            tab1, tab2 = st.tabs(["📄 Ver Detalles", "⚙️ Editar Documento"])
+            
+            with tab1:
+                colA, colB = st.columns(2)
+                with colA:
+                    st.write(f"**Área Responsable:** {datos.get('area_usuaria', 'N/A')}")
+                    st.write(f"**Coordinación:** {datos.get('coordinacion_asignada', 'N/A')}")
+                    st.write(f"**Monto:** ${datos.get('monto', 0):,.2f}")
+                with colB:
+                    st.write(f"**Estatus:** {datos.get('estatus', 'N/A')}")
+                    st.write(f"**Fecha Registro:** {datos.get('fecha_oficio', 'N/A')}")
+                    link = datos.get('link_pdf', '')
+                    if link and link.startswith("http"):
+                        st.link_button("📂 Abrir Carpeta del Expediente", link)
+                    else:
+                        st.info("Sin expediente digital anexado.")
+            
+            with tab2:
+                st.info("Actualiza los datos de la SOLPED aquí mismo.")
+                with st.form("form_editar"):
+                    lista_estatus = ["EN PROCESO", "COMPLETADA", "CANCELADA"]
+                    estatus_actual = datos.get('estatus', 'EN PROCESO')
+                    idx_estatus = lista_estatus.index(estatus_actual) if estatus_actual in lista_estatus else 0
+                    
+                    nuevo_estatus = st.selectbox("Actualizar Estatus", lista_estatus, index=idx_estatus)
+                    nuevo_link = st.text_input("Actualizar Enlace de la Carpeta", value=datos.get('link_pdf', ''))
+                    nuevo_monto = st.number_input("Corregir Monto ($)", value=float(datos.get('monto', 0)), min_value=0.0)
+                    
+                    if st.form_submit_button("💾 Guardar Cambios"):
+                        try:
                             supabase.table("solicitudes_solped").update({
                                 "estatus": nuevo_estatus,
                                 "link_pdf": nuevo_link,
                                 "monto": nuevo_monto
                             }).eq("id", datos['id']).execute()
-                            st.success("✅ ¡Actualización exitosa! Vuelve a buscar el número para ver los cambios.")
                             
-            else:
-                st.error("❌ El número de SOLPED no existe en los registros.")
+                            st.success("✅ ¡Base de datos actualizada correctamente!")
+                            st.balloons() # Un toque visual para confirmar el guardado
+                        except Exception as e:
+                            st.error(f"Error al guardar: {e}")
+                        
         else:
-            st.warning("⚠️ Por favor ingresa un número de SOLPED para buscar.")
+            st.error("❌ El número de SOLPED no existe en los registros.")
