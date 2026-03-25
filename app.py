@@ -177,21 +177,21 @@ elif menu == "🛒 Agregar Artículos":
     except Exception as e: st.error(f"Error: {e}")
 
 # ==========================================
-# PANTALLA 4: BUSCAR Y EDITAR (CON BOTÓN Y MEMORIA)
+# PANTALLA 4: BUSCAR Y EDITAR (CON AUTO-RESETEO)
 # ==========================================
 elif menu == "🔍 Buscar y Editar":
     st.title("🔍 Localizador y Edición de Documentos")
     
-    # Creamos una "memoria" interna para que el sistema no olvide qué estamos editando
+    # Creamos una "memoria" interna
     if 'busqueda_activa' not in st.session_state:
         st.session_state.busqueda_activa = ""
 
-    # Acomodamos el buscador y el botón en la misma línea
+    # Acomodamos el buscador y el botón
     col_input, col_btn = st.columns([3, 1])
     with col_input:
         busqueda_actual = st.text_input("Ingrese el Número exacto de SOLPED:")
     with col_btn:
-        st.markdown("<br>", unsafe_allow_html=True) # Espacio para alinear el botón con el texto
+        st.markdown("<br>", unsafe_allow_html=True) 
         if st.button("🔍 Buscar SOLPED", use_container_width=True):
             st.session_state.busqueda_activa = busqueda_actual
             
@@ -239,8 +239,15 @@ elif menu == "🔍 Buscar y Editar":
                                 "monto": nuevo_monto
                             }).eq("id", datos['id']).execute()
                             
-                            st.success("✅ ¡Base de datos actualizada correctamente! Los cambios ya están en la nube.")
-                            st.balloons() # Globos de celebración
+                            st.success("✅ ¡Base de datos actualizada! Cerrando expediente...")
+                            st.balloons() 
+                            
+                            # --- LA MAGIA DEL AUTO-RESETEO ---
+                            import time
+                            time.sleep(2.5) # Pausa de 2.5 segundos para que Bubu vea los globos
+                            st.session_state.busqueda_activa = "" # Borramos la memoria
+                            st.rerun() # Recargamos la pantalla para dejarla limpia
+                            
                         except Exception as e:
                             st.error(f"Error al guardar: {e}")
         else:
