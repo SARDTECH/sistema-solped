@@ -6,10 +6,16 @@ import datetime
 # ==========================================
 # CONFIGURACIÓN TOP Y DISEÑO METRO CDMX
 # ==========================================
-st.set_page_config(page_title="Gerencia SOLPED - Metro CDMX", page_icon="🚇", layout="wide")
+# Aquí puedes cambiar "SIGAS" por el nombre que elijan
+st.set_page_config(page_title="SIGAS - Metro CDMX", page_icon="🚇", layout="wide")
 
 st.markdown("""
     <style>
+    /* Ocultar marcas de agua de Streamlit */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
     :root {
         --metro-naranja: #F6831E;
         --metro-oscuro: #2C2C2C;
@@ -41,7 +47,8 @@ try:
 except:
     pass
 
-st.sidebar.title("Gerencia de Compras")
+# CAMBIO 1: Nuevo nombre oficial de la Subgerencia
+st.sidebar.title("Subgerencia de Adquisiciones")
 menu = st.sidebar.radio(
     "Navegación del Sistema:",
     ("📊 Dashboard Gerencial", "📝 Registrar SOLPED", "🛒 Agregar Artículos", "🔍 Buscar y Editar")
@@ -85,7 +92,6 @@ if menu == "📊 Dashboard Gerencial":
                 min_date = datetime.date.today() - datetime.timedelta(days=30)
                 max_date = datetime.date.today()
             
-            # FILTRO POR RANGO EN EL SIDEBAR (Sin cuadro azul)
             st.sidebar.markdown("---")
             st.sidebar.subheader("📅 Rango de Fechas")
             
@@ -122,7 +128,8 @@ if menu == "📊 Dashboard Gerencial":
                 if 'estatus' in df_filtrado.columns: st.bar_chart(df_filtrado['estatus'].value_counts())
             
             st.subheader("📋 Base de Datos Filtrada")
-            cols_mostrar = ['numero_solped', 'area_usuaria', 'monto', 'fecha_oficio', 'estatus', 'link_pdf']
+            # CAMBIO 2: Agregamos la columna 'descripcion' para que se vea en la tabla principal
+            cols_mostrar = ['numero_solped', 'area_usuaria', 'descripcion', 'monto', 'fecha_oficio', 'estatus', 'link_pdf']
             cols_reales = [c for c in cols_mostrar if c in df_filtrado.columns]
             st.dataframe(df_filtrado[cols_reales], column_config={"link_pdf": st.column_config.LinkColumn("Carpeta / Archivo")}, use_container_width=True)
             
@@ -144,7 +151,6 @@ elif menu == "📝 Registrar SOLPED":
         with col2:
             coord = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
             estatus = st.selectbox("Estatus de la Compra", ["EN PROCESO", "COMPLETADA", "CANCELADA"])
-            # NUEVO CONCEPTO: CARPETA DE EXPEDIENTE
             link_pdf = st.text_input("Enlace a la Carpeta del Expediente (Drive, OneDrive, etc.)")
             st.caption("☝️ Pega aquí el enlace de la carpeta que contiene la SOLPED, contratos y anexos.")
             
@@ -182,11 +188,9 @@ elif menu == "🛒 Agregar Artículos":
 elif menu == "🔍 Buscar y Editar":
     st.title("🔍 Localizador y Edición de Documentos")
     
-    # Creamos una "memoria" interna
     if 'busqueda_activa' not in st.session_state:
         st.session_state.busqueda_activa = ""
 
-    # Acomodamos el buscador y el botón
     col_input, col_btn = st.columns([3, 1])
     with col_input:
         busqueda_actual = st.text_input("Ingrese el Número exacto de SOLPED:")
@@ -195,7 +199,6 @@ elif menu == "🔍 Buscar y Editar":
         if st.button("🔍 Buscar SOLPED", use_container_width=True):
             st.session_state.busqueda_activa = busqueda_actual
             
-    # Si hay una búsqueda guardada en la memoria, mostramos todo
     if st.session_state.busqueda_activa:
         res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", st.session_state.busqueda_activa).execute()
         
@@ -242,11 +245,10 @@ elif menu == "🔍 Buscar y Editar":
                             st.success("✅ ¡Base de datos actualizada! Cerrando expediente...")
                             st.balloons() 
                             
-                            # --- LA MAGIA DEL AUTO-RESETEO ---
                             import time
-                            time.sleep(2.5) # Pausa de 2.5 segundos para que Bubu vea los globos
-                            st.session_state.busqueda_activa = "" # Borramos la memoria
-                            st.rerun() # Recargamos la pantalla para dejarla limpia
+                            time.sleep(2.5) 
+                            st.session_state.busqueda_activa = "" 
+                            st.rerun() 
                             
                         except Exception as e:
                             st.error(f"Error al guardar: {e}")
