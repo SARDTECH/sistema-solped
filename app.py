@@ -164,12 +164,12 @@ elif menu == "📝 Registrar SOLPED":
                 st.success(f"✅ SOLPED {numero} registrada.")
 
 # ==========================================
-# PANTALLA 3: AGREGAR ARTÍCULOS (FINAL)
+# PANTALLA 3: AGREGAR ARTÍCULOS (VERSIÓN FINAL)
 # ==========================================
 elif menu == "🛒 Agregar Artículos":
     st.title("🛒 Catálogo de Partidas")
     try:
-        # Consultamos las SOLPEDs disponibles para el selector
+        # Traemos las SOLPEDs para vincular los artículos
         res_solpeds = supabase.table("solicitudes_solped").select("id, numero_solped").execute()
         
         if res_solpeds.data:
@@ -180,34 +180,36 @@ elif menu == "🛒 Agregar Artículos":
                 with col1:
                     seleccion = st.selectbox("Asignar a SOLPED:", list(opciones.keys()))
                     codigo = st.text_input("Código de Partida *")
-                    monto_art = st.number_input("Monto de Partida ($)", min_value=0.0)
+                    monto_art = st.number_input("Costo Unitario/Partida ($)", min_value=0.0)
                 with col2:
+                    # El requerimiento de Bubu: Selección clara de coordinación
                     coord = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
-                    desc_art = st.text_input("Descripción de la Partida")
+                    desc_art = st.text_input("Descripción detallada del artículo")
                 
-                enviado = st.form_submit_button("Guardar Partida")
+                enviado = st.form_submit_button("🚀 Guardar Partida en Expediente")
                 
                 if enviado:
                     if not codigo.strip():
-                        st.error("❌ El Código de Partida es obligatorio.")
+                        st.error("❌ Error: El Código de Partida no puede estar vacío.")
                     else:
-                        # Sanitización y guardado directo a la nueva tabla
-                        codigo_limpio = codigo.strip().upper()
+                        # Sanitización: Forzamos mayúsculas para mantener orden gerencial
+                        codigo_upper = codigo.strip().upper()
                         
                         supabase.table("partidas_codigos").insert({
                             "solped_id": opciones[seleccion], 
-                            "codigo_articulo": codigo_limpio, 
+                            "codigo_articulo": codigo_upper, 
                             "descripcion": desc_art, 
                             "monto": monto_art,
                             "coordinacion": coord
                         }).execute()
                         
-                        st.success(f"✅ Partida {codigo_limpio} guardada exitosamente en SOLPED {seleccion} como {coord}")
+                        st.success(f"✅ Partida {codigo_upper} vinculada exitosamente a la SOLPED {seleccion} ({coord})")
+                        st.balloons()
         else:
-            st.warning("⚠️ No hay SOLPEDs registradas. Primero registra una en 'Registrar SOLPED'.")
+            st.warning("⚠️ No se encontraron SOLPEDs en la base de datos. Registra una primero.")
                         
     except Exception as e: 
-        st.error(f"Error de sistema: {e}")
+        st.error(f"Error técnico en el módulo de partidas: {e}")
 
 # ==========================================
 # PANTALLA 4: BUSCAR Y EDITAR (CON AUTO-RESETEO)
