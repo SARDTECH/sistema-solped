@@ -5,13 +5,13 @@ import datetime
 import time
 
 # ==========================================
-# CONFIGURACIÓN TOP Y DISEÑO METRO CDMX
+# 1. CONFIGURACIÓN DE PÁGINA Y ESTILO METRO
 # ==========================================
 st.set_page_config(page_title="SIGAS - Metro CDMX", page_icon="🚇", layout="wide")
 
 st.markdown("""
     <style>
-    /* 🛡️ INTERFAZ BLINDADA: BOTÓN DE MENÚ SIEMPRE VISIBLE */
+    /* 🛡️ BOTÓN ANTIPÁNICO: Flecha de menú siempre visible con borde naranja */
     [data-testid="stSidebarCollapseButton"] {
         display: block !important;
         visibility: visible !important;
@@ -25,24 +25,21 @@ st.markdown("""
         box-shadow: 2px 2px 10px rgba(0,0,0,0.2) !important;
         padding: 5px !important;
     }
-    
-    [data-testid="stSidebarCollapseButton"] i, 
     [data-testid="stSidebarCollapseButton"] svg {
         color: #F6831E !important;
-        width: 25px !important;
-        height: 25px !important;
+        width: 28px !important;
+        height: 28px !important;
     }
 
-    .main .block-container {
-        padding-top: 4rem !important;
-    }
+    /* Ajuste de espacio para que el título no choque con el botón */
+    .main .block-container { padding-top: 4.5rem !important; }
 
-    /* Ocultar menú de Streamlit y pie de página, dejar HEADER para la flecha */
+    /* Ocultar elementos nativos de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display:none;}
 
-    /* Identidad Corporativa Metro CDMX */
+    /* Identidad Visual Metro CDMX */
     :root {
         --metro-naranja: #F6831E;
         --metro-oscuro: #2C2C2C;
@@ -52,15 +49,24 @@ st.markdown("""
         border-right: 4px solid var(--metro-naranja);
     }
     h1, h2, h3 { color: var(--metro-oscuro) !important; font-family: 'Arial', sans-serif; }
-    [data-testid="stMetricValue"] { color: var(--metro-naranja) !important; font-weight: 900 !important; font-size: 2.5rem !important; }
+    [data-testid="stMetricValue"] { color: var(--metro-naranja) !important; font-weight: 900 !important; }
     
-    /* Botones del Sistema */
-    .stButton>button { background-color: var(--metro-naranja); color: white; border-radius: 6px; border: none; font-weight: bold; }
+    /* Botones Naranjas Estilo Institucional */
+    .stButton>button { 
+        background-color: var(--metro-naranja); 
+        color: white; 
+        border-radius: 6px; 
+        border: none; 
+        font-weight: bold;
+        width: 100%;
+    }
     .stButton>button:hover { background-color: var(--metro-oscuro); color: var(--metro-naranja); }
     </style>
 """, unsafe_allow_html=True)
 
-# --- CONEXIÓN A LA NUBE (SUPABASE) ---
+# ==========================================
+# 2. CONEXIÓN A BASE DE DATOS (SUPABASE)
+# ==========================================
 SUPABASE_URL = "https://emickgfmgyzkabmxbmqn.supabase.co"
 SUPABASE_KEY = "sb_publishable_WvpRWnDzmRJ-mmrZedWrTA_agKAp_Kg"
 
@@ -70,266 +76,185 @@ def init_connection():
 
 supabase = init_connection()
 
-# --- MENÚ DE NAVEGACIÓN ---
+# ==========================================
+# 3. BARRA LATERAL (SIDEBAR)
+# ==========================================
 try:
-    st.sidebar.image("logo m.png", width=150)
+    st.sidebar.image("logo m.png", width=140)
 except:
-    pass
+    st.sidebar.title("🚇 METRO")
 
 st.sidebar.title("Subgerencia de Adquisiciones")
+st.sidebar.markdown("---")
+
 menu = st.sidebar.radio(
     "Navegación del Sistema:",
     ("📊 Dashboard Gerencial", "📝 Registrar SOLPED", "🛒 Agregar Artículos", "🔍 Buscar y Editar")
 )
 
-# ==========================================
-# FUNCIONES DE LIMPIEZA DE FECHAS
-# ==========================================
-def limpiar_fecha_metro(fecha_str):
+# --- Función de apoyo para fechas ---
+def limpiar_fecha(f_str):
     try:
-        if pd.isna(fecha_str) or str(fecha_str).strip() == "": return pd.NaT
-        f = str(fecha_str).replace('/', '-').strip()
-        partes = f.split('-')
-        if len(partes) == 3 and len(partes[2]) == 2:
-            partes[2] = "20" + partes[2]
-            f = f"{partes[0]}-{partes[1]}-{partes[2]}"
-        return pd.to_datetime(f, format='%d-%m-%Y', errors='coerce')
+        return pd.to_datetime(f_str, dayfirst=True, errors='coerce')
     except:
-        return pd.to_datetime(str(fecha_str), errors='coerce', dayfirst=True)
+        return pd.NaT
 
 # ==========================================
 # PANTALLA 1: DASHBOARD GERENCIAL
 # ==========================================
 if menu == "📊 Dashboard Gerencial":
-    st.title("📈 Panel de Control Gerencial - SOLPEDs")
+    st.title("📈 Panel de Control Gerencial")
     
     try:
-        res_solpeds = supabase.table("solicitudes_solped").select("*").execute()
-        df = pd.DataFrame(res_solpeds.data)
+        res = supabase.table("solicitudes_solped").select("*").execute()
+        df = pd.DataFrame(res.data)
         
         if df.empty:
-            st.info("No hay datos para mostrar en la base de datos.")
+            st.info("No hay datos registrados aún.")
         else:
-            df['fecha_limpia'] = df['fecha_oficio'].apply(limpiar_fecha_metro)
+            # Procesamiento de montos y fechas
+            df['monto'] = pd.to_numeric(df['monto'], errors='coerce').fillna(0)
+            df['fecha_dt'] = df['fecha_oficio'].apply(limpiar_fecha)
             
-            fechas_validas = df['fecha_limpia'].dropna()
-            if not fechas_validas.empty:
-                min_date = fechas_validas.min().date()
-                max_date = fechas_validas.max().date()
-            else:
-                min_date = datetime.date.today() - datetime.timedelta(days=30)
-                max_date = datetime.date.today()
+            # Métricas Principales
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Total SOLPEDs", f"{len(df)}")
+            c2.metric("Inversión Total", f"${df['monto'].sum():,.2f}")
+            c3.metric("Ticket Promedio", f"${(df['monto'].mean()):,.2f}")
             
-            st.sidebar.markdown("---")
-            st.sidebar.subheader("📅 Rango de Fechas")
-            
-            rango_fechas = st.sidebar.date_input(
-                "Periodo de Consulta:",
-                value=(min_date, max_date),
-                min_value=min_date,
-                max_value=max_date,
-                format="DD/MM/YYYY"
-            )
-            
-            df_filtrado = df.copy()
-            if len(rango_fechas) == 2:
-                fecha_inicio, fecha_fin = rango_fechas
-                df_filtrado = df_filtrado[
-                    (df_filtrado['fecha_limpia'].dt.date >= fecha_inicio) & 
-                    (df_filtrado['fecha_limpia'].dt.date <= fecha_fin)
-                ]
-
-            df_filtrado['monto'] = pd.to_numeric(df_filtrado['monto'], errors='coerce').fillna(0)
-
-            col1, col2, col3 = st.columns(3)
-            col1.metric("Total de SOLPEDs", len(df_filtrado))
-            col2.metric("Monto Total Invertido", f"${df_filtrado['monto'].sum():,.2f}")
-            col3.metric("Promedio por Oficio", f"${(df_filtrado['monto'].mean() if len(df_filtrado)>0 else 0):,.2f}")
             st.divider()
             
-            colA, colB = st.columns(2)
-            with colA:
-                st.write("**Gasto por Área Usuaria**")
-                st.bar_chart(df_filtrado.groupby('area_usuaria')['monto'].sum())
-            with colB:
-                st.write("**Estatus de SOLPEDs**")
-                if 'estatus' in df_filtrado.columns: st.bar_chart(df_filtrado['estatus'].value_counts())
+            # Tabla de Datos con Formato de Moneda $ MXN
+            st.subheader("📋 Listado Maestro de SOLPEDs")
+            cols = ['numero_solped', 'area_usuaria', 'descripcion', 'monto', 'fecha_oficio', 'estatus', 'link_pdf']
+            existentes = [c for c in cols if c in df.columns]
             
-            st.subheader("📋 Base de Datos Filtrada")
-            cols_mostrar = ['numero_solped', 'area_usuaria', 'descripcion', 'monto', 'fecha_oficio', 'estatus', 'link_pdf']
-            cols_reales = [c for c in cols_mostrar if c in df_filtrado.columns]
-            
-            # Formato de dinero a la columna sin perder la capacidad de ordenar
             st.dataframe(
-                df_filtrado[cols_reales], 
+                df[existentes],
                 column_config={
-                    "link_pdf": st.column_config.LinkColumn("Carpeta / Archivo"),
-                    "monto": st.column_config.NumberColumn("Monto ($ MXN)", format="$ %.2f")
-                }, 
-                use_container_width=True
+                    "monto": st.column_config.NumberColumn("Monto ($ MXN)", format="$ %.2f"),
+                    "link_pdf": st.column_config.LinkColumn("Expediente Digital"),
+                    "numero_solped": "SOLPED #"
+                },
+                use_container_width=True,
+                hide_index=True
             )
-            
     except Exception as e:
-        st.error(f"Error de sistema: {e}")
+        st.error(f"Error al cargar Dashboard: {e}")
 
 # ==========================================
-# PANTALLA 2: REGISTRAR SOLPED
+# PANTALLA 2: REGISTRAR SOLPED (CON ESCUDO ANTI-DUPLICADOS)
 # ==========================================
 elif menu == "📝 Registrar SOLPED":
-    st.title("📝 Alta de Nueva SOLPED")
-    with st.form("form_nube"):
+    st.title("📝 Registro de Nueva SOLPED")
+    st.info("Complete los campos para dar de alta un nuevo expediente en la nube.")
+    
+    with st.form("registro_form"):
         col1, col2 = st.columns(2)
         with col1:
-            numero = st.text_input("Número de SOLPED / Oficio *")
+            num = st.text_input("Número de SOLPED / Oficio *")
             area = st.selectbox("Área Usuaria", ["DIRECCIÓN DE INSTALACIONES FIJAS", "DIRECCIÓN DE MANTENIMIENTO DE MATERIAL RODANTE", "CAPITAL HUMANO", "DIRECCIÓN GENERAL DE OPERACIÓN", "OTRO"])
-            fecha = st.date_input("Fecha del Documento", format="DD/MM/YYYY")
-            monto = st.number_input("Monto Estimado ($)", min_value=0.0)
+            fec = st.date_input("Fecha de Documento", format="DD/MM/YYYY")
         with col2:
-            coord = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
-            estatus = st.selectbox("Estatus de la Compra", ["EN PROCESO", "COMPLETADA", "CANCELADA"])
-            link_pdf = st.text_input("Enlace a la Carpeta del Expediente (Drive, OneDrive, etc.)")
-            st.caption("☝️ Pega aquí el enlace de la carpeta que contiene la SOLPED, contratos y anexos.")
-            
-        desc = st.text_area("Justificación / Descripción Breve")
+            mon = st.number_input("Monto Inicial ($)", min_value=0.0, step=100.0)
+            coord = st.radio("Coordinación", ["CCP (Nacional)", "CCE (Extranjero)"], horizontal=True)
+            est = st.selectbox("Estatus Inicial", ["EN PROCESO", "COMPLETADA", "CANCELADA"])
         
-        if st.form_submit_button("Subir al Sistema"):
-            if numero == "":
-                st.error("❌ El Número de SOLPED es obligatorio.")
+        det = st.text_area("Descripción / Justificación del Gasto")
+        lnk = st.text_input("Enlace a Carpeta (Drive/OneDrive)")
+        
+        if st.form_submit_button("💾 Guardar en Base de Datos"):
+            if not num:
+                st.error("❌ El número de SOLPED es obligatorio.")
             else:
                 try:
-                    fecha_formato_db = fecha.strftime('%d-%m-%Y')
+                    f_db = fec.strftime('%d-%m-%Y')
                     supabase.table("solicitudes_solped").insert({
-                        "numero_solped": numero, 
-                        "area_usuaria": area, 
-                        "coordinacion_asignada": coord, 
-                        "monto": monto, 
-                        "fecha_oficio": fecha_formato_db, 
-                        "link_pdf": link_pdf, 
-                        "descripcion": desc, 
-                        "estatus": estatus
+                        "numero_solped": num, "area_usuaria": area, "monto": mon,
+                        "fecha_oficio": f_db, "coordinacion_asignada": coord,
+                        "estatus": est, "descripcion": det, "link_pdf": lnk
                     }).execute()
-                    st.success(f"✅ SOLPED {numero} registrada con éxito.")
+                    st.success(f"✅ ¡SOLPED {num} registrada exitosamente!")
+                    st.balloons()
                 except Exception as e:
-                    # MAGIA ESPÍA PARA DETECTAR EL ERROR REAL DE SUPABASE
-                    st.error("🚨 ALERTA TÉCNICA: EL SISTEMA DETECTÓ UN BLOQUEO 🚨")
-                    st.error(f"Detalle exacto del error: {str(e)}")
-                    st.info("💡 Director: Tómale una foto a este cuadro rojo y pásamelo. Con eso sabremos el 100% de la verdad.")
+                    # ESCUDO PARA BUBU: Detectar si el número ya existe
+                    if "duplicate key" in str(e).lower():
+                        st.warning(f"⚠️ La SOLPED **{num}** ya fue registrada anteriormente.")
+                        st.info("💡 **Acción recomendada:** Si quieres actualizar sus datos, ve al módulo **'🔍 Buscar y Editar'**.")
+                    else:
+                        st.error(f"🚨 Error técnico: {e}")
 
 # ==========================================
-# PANTALLA 3: AGREGAR ARTÍCULOS
+# PANTALLA 3: AGREGAR ARTÍCULOS (SEGMENTACIÓN CCP/CCE)
 # ==========================================
 elif menu == "🛒 Agregar Artículos":
-    st.title("🛒 Catálogo de Partidas")
+    st.title("🛒 Catálogo de Partidas por Oficio")
     try:
-        # Traemos las SOLPEDs para vincular los artículos
-        res_solpeds = supabase.table("solicitudes_solped").select("id, numero_solped").execute()
-        
-        if res_solpeds.data:
-            opciones = {str(s['numero_solped']): s['id'] for s in res_solpeds.data}
+        res = supabase.table("solicitudes_solped").select("id, numero_solped").execute()
+        if res.data:
+            opciones = {str(s['numero_solped']): s['id'] for s in res.data}
             
-            with st.form("form_articulos"):
-                col1, col2 = st.columns(2)
-                with col1:
-                    seleccion = st.selectbox("Asignar a SOLPED:", list(opciones.keys()))
-                    codigo = st.text_input("Código de Partida *")
-                    monto_art = st.number_input("Costo Unitario/Partida ($)", min_value=0.0)
-                with col2:
-                    coord = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
-                    desc_art = st.text_input("Descripción detallada del artículo")
+            with st.form("art_form"):
+                c1, c2 = st.columns(2)
+                with c1:
+                    sol_sel = st.selectbox("Vincular a SOLPED:", list(opciones.keys()))
+                    cod = st.text_input("Código de Partida / Artículo *")
+                    mto = st.number_input("Monto de la Partida ($)", min_value=0.0)
+                with c2:
+                    tipo = st.radio("Segmentación de Compra:", ["CCP (Nacional)", "CCE (Extranjero)"])
+                    dsc = st.text_input("Descripción del Bien/Servicio")
                 
-                enviado = st.form_submit_button("🚀 Guardar Partida en Expediente")
-                
-                if enviado:
-                    if not codigo.strip():
-                        st.error("❌ Error: El Código de Partida no puede estar vacío.")
-                    else:
-                        # Sanitización: Forzamos mayúsculas para mantener orden gerencial
-                        codigo_upper = codigo.strip().upper()
-                        
+                if st.form_submit_button("🚀 Registrar Artículo"):
+                    if cod:
                         supabase.table("partidas_codigos").insert({
-                            "solped_id": opciones[seleccion], 
-                            "codigo_articulo": codigo_upper, 
-                            "descripcion": desc_art, 
-                            "monto": monto_art,
-                            "coordinacion": coord
+                            "solped_id": opciones[sol_sel], "codigo_articulo": cod.upper(),
+                            "descripcion": dsc, "monto": mto, "coordinacion": tipo
                         }).execute()
-                        
-                        st.success(f"✅ Partida {codigo_upper} vinculada exitosamente a la SOLPED {seleccion} ({coord})")
-                        st.balloons()
-        else:
-            st.warning("⚠️ No se encontraron SOLPEDs en la base de datos. Registra una primero.")
-                        
-    except Exception as e: 
-        st.error(f"Error técnico en el módulo de partidas: {e}")
+                        st.success(f"✅ Partida {cod.upper()} añadida a la SOLPED {sol_sel}")
+                    else:
+                        st.error("❌ Indique el código del artículo.")
+    except Exception as e:
+        st.error(f"Error en módulo de artículos: {e}")
 
 # ==========================================
-# PANTALLA 4: BUSCAR Y EDITAR
+# PANTALLA 4: BUSCAR Y EDITAR (CON AUTO-RESETEO)
 # ==========================================
 elif menu == "🔍 Buscar y Editar":
-    st.title("🔍 Localizador y Edición de Documentos")
+    st.title("🔍 Localizador de Expedientes")
     
-    if 'busqueda_activa' not in st.session_state:
-        st.session_state.busqueda_activa = ""
+    if 'busqueda_id' not in st.session_state: st.session_state.busqueda_id = ""
 
-    col_input, col_btn = st.columns([3, 1])
-    with col_input:
-        busqueda_actual = st.text_input("Ingrese el Número exacto de SOLPED:")
+    col_srch, col_btn = st.columns([3, 1])
+    with col_srch:
+        txt = st.text_input("Ingrese el número exacto de SOLPED a editar:")
     with col_btn:
-        st.markdown("<br>", unsafe_allow_html=True) 
-        if st.button("🔍 Buscar SOLPED", use_container_width=True):
-            st.session_state.busqueda_activa = busqueda_actual
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔍 Localizar"): st.session_state.busqueda_id = txt
             
-    if st.session_state.busqueda_activa:
-        res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", st.session_state.busqueda_activa).execute()
+    if st.session_state.busqueda_id:
+        res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", st.session_state.busqueda_id).execute()
         
         if res.data:
-            datos = res.data[0]
-            st.success("✅ Expediente Localizado")
+            item = res.data[0]
+            st.success(f"✅ Expediente de la SOLPED {st.session_state.busqueda_id} listo para edición.")
             
-            tab1, tab2 = st.tabs(["📄 Ver Detalles", "⚙️ Editar Documento"])
-            
-            with tab1:
-                colA, colB = st.columns(2)
-                with colA:
-                    st.write(f"**Área Responsable:** {datos.get('area_usuaria', 'N/A')}")
-                    st.write(f"**Coordinación:** {datos.get('coordinacion_asignada', 'N/A')}")
-                    st.write(f"**Monto:** ${float(datos.get('monto', 0)):,.2f}")
-                with colB:
-                    st.write(f"**Estatus:** {datos.get('estatus', 'N/A')}")
-                    st.write(f"**Fecha Registro:** {datos.get('fecha_oficio', 'N/A')}")
-                    link = datos.get('link_pdf', '')
-                    if link and link.startswith("http"):
-                        st.link_button("📂 Abrir Carpeta del Expediente", link)
-                    else:
-                        st.info("Sin expediente digital anexado.")
-            
-            with tab2:
-                st.info("Actualiza los datos de la SOLPED aquí mismo.")
-                with st.form("form_editar"):
-                    lista_estatus = ["EN PROCESO", "COMPLETADA", "CANCELADA"]
-                    estatus_actual = datos.get('estatus', 'EN PROCESO')
-                    idx_estatus = lista_estatus.index(estatus_actual) if estatus_actual in lista_estatus else 0
+            with st.form("edit_form"):
+                ca, cb = st.columns(2)
+                with ca:
+                    new_m = st.number_input("Actualizar Monto ($)", value=float(item.get('monto', 0)))
+                    new_l = st.text_input("Actualizar Link Drive", value=item.get('link_pdf', ''))
+                with cb:
+                    new_e = st.selectbox("Cambiar Estatus", ["EN PROCESO", "COMPLETADA", "CANCELADA"])
+                
+                if st.form_submit_button("💾 Actualizar y Cerrar"):
+                    supabase.table("solicitudes_solped").update({
+                        "monto": new_m, "link_pdf": new_l, "estatus": new_e
+                    }).eq("id", item['id']).execute()
                     
-                    nuevo_estatus = st.selectbox("Actualizar Estatus", lista_estatus, index=idx_estatus)
-                    nuevo_link = st.text_input("Actualizar Enlace de la Carpeta", value=datos.get('link_pdf', ''))
-                    nuevo_monto = st.number_input("Corregir Monto ($)", value=float(datos.get('monto', 0)), min_value=0.0)
-                    
-                    if st.form_submit_button("💾 Guardar Cambios"):
-                        try:
-                            supabase.table("solicitudes_solped").update({
-                                "estatus": nuevo_estatus,
-                                "link_pdf": nuevo_link,
-                                "monto": nuevo_monto
-                            }).eq("id", datos['id']).execute()
-                            
-                            st.success("✅ ¡Base de datos actualizada! Cerrando expediente...")
-                            st.balloons() 
-                            
-                            time.sleep(2.5) 
-                            st.session_state.busqueda_activa = "" 
-                            st.rerun() 
-                            
-                        except Exception as e:
-                            st.error(f"Error al guardar: {e}")
+                    st.success("✅ Cambios guardados. Regresando al inicio...")
+                    st.balloons()
+                    time.sleep(2)
+                    st.session_state.busqueda_id = ""
+                    st.rerun()
         else:
-            st.error("❌ El número de SOLPED no existe en los registros.")
+            st.error("❌ No se encontró ningún registro con ese número.")
