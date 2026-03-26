@@ -2,20 +2,44 @@ import streamlit as st
 import pandas as pd
 from supabase import create_client
 import datetime
+import time
 
 # ==========================================
 # CONFIGURACIÓN TOP Y DISEÑO METRO CDMX
 # ==========================================
-# Aquí puedes cambiar "SIGAS" por el nombre que elijan
 st.set_page_config(page_title="SIGAS - Metro CDMX", page_icon="🚇", layout="wide")
 
 st.markdown("""
     <style>
-    /* Ocultar menú de Streamlit y pie de página, pero DEJAR EL HEADER VIVO para la flecha */
+    /* 🛡️ INTERFAZ BLINDADA: BOTÓN DE MENÚ SIEMPRE VISIBLE */
+    [data-testid="stSidebarCollapseButton"] {
+        display: block !important;
+        visibility: visible !important;
+        position: fixed !important;
+        top: 15px !important;
+        left: 15px !important;
+        background-color: white !important;
+        border: 2px solid #F6831E !important; 
+        border-radius: 8px !important;
+        z-index: 999999 !important;
+        box-shadow: 2px 2px 10px rgba(0,0,0,0.2) !important;
+        padding: 5px !important;
+    }
+    
+    [data-testid="stSidebarCollapseButton"] i, 
+    [data-testid="stSidebarCollapseButton"] svg {
+        color: #F6831E !important;
+        width: 25px !important;
+        height: 25px !important;
+    }
+
+    .main .block-container {
+        padding-top: 4rem !important;
+    }
+
+    /* Ocultar menú de Streamlit y pie de página, dejar HEADER para la flecha */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    
-    /* Ocultamos específicamente el botón de "Deploy" para que no estorbe */
     .stDeployButton {display:none;}
 
     /* Identidad Corporativa Metro CDMX */
@@ -52,7 +76,6 @@ try:
 except:
     pass
 
-# CAMBIO 1: Nuevo nombre oficial de la Subgerencia
 st.sidebar.title("Subgerencia de Adquisiciones")
 menu = st.sidebar.radio(
     "Navegación del Sistema:",
@@ -133,10 +156,18 @@ if menu == "📊 Dashboard Gerencial":
                 if 'estatus' in df_filtrado.columns: st.bar_chart(df_filtrado['estatus'].value_counts())
             
             st.subheader("📋 Base de Datos Filtrada")
-            # CAMBIO 2: Agregamos la columna 'descripcion' para que se vea en la tabla principal
             cols_mostrar = ['numero_solped', 'area_usuaria', 'descripcion', 'monto', 'fecha_oficio', 'estatus', 'link_pdf']
             cols_reales = [c for c in cols_mostrar if c in df_filtrado.columns]
-            st.dataframe(df_filtrado[cols_reales], column_config={"link_pdf": st.column_config.LinkColumn("Carpeta / Archivo")}, use_container_width=True)
+            
+            # Formato de dinero a la columna sin perder la capacidad de ordenar
+            st.dataframe(
+                df_filtrado[cols_reales], 
+                column_config={
+                    "link_pdf": st.column_config.LinkColumn("Carpeta / Archivo"),
+                    "monto": st.column_config.NumberColumn("Monto ($ MXN)", format="$ %.2f")
+                }, 
+                use_container_width=True
+            )
             
     except Exception as e:
         st.error(f"Error de sistema: {e}")
@@ -179,13 +210,13 @@ elif menu == "📝 Registrar SOLPED":
                     }).execute()
                     st.success(f"✅ SOLPED {numero} registrada con éxito.")
                 except Exception as e:
-                    # AQUÍ ESTÁ LA MAGIA ESPÍA
+                    # MAGIA ESPÍA PARA DETECTAR EL ERROR REAL DE SUPABASE
                     st.error("🚨 ALERTA TÉCNICA: EL SISTEMA DETECTÓ UN BLOQUEO 🚨")
                     st.error(f"Detalle exacto del error: {str(e)}")
                     st.info("💡 Director: Tómale una foto a este cuadro rojo y pásamelo. Con eso sabremos el 100% de la verdad.")
 
 # ==========================================
-# PANTALLA 3: AGREGAR ARTÍCULOS (VERSIÓN FINAL)
+# PANTALLA 3: AGREGAR ARTÍCULOS
 # ==========================================
 elif menu == "🛒 Agregar Artículos":
     st.title("🛒 Catálogo de Partidas")
@@ -203,7 +234,6 @@ elif menu == "🛒 Agregar Artículos":
                     codigo = st.text_input("Código de Partida *")
                     monto_art = st.number_input("Costo Unitario/Partida ($)", min_value=0.0)
                 with col2:
-                    # El requerimiento de Bubu: Selección clara de coordinación
                     coord = st.radio("Coordinación Asignada", ["CCP (Nacional)", "CCE (Extranjero)"])
                     desc_art = st.text_input("Descripción detallada del artículo")
                 
@@ -233,7 +263,7 @@ elif menu == "🛒 Agregar Artículos":
         st.error(f"Error técnico en el módulo de partidas: {e}")
 
 # ==========================================
-# PANTALLA 4: BUSCAR Y EDITAR (CON AUTO-RESETEO)
+# PANTALLA 4: BUSCAR Y EDITAR
 # ==========================================
 elif menu == "🔍 Buscar y Editar":
     st.title("🔍 Localizador y Edición de Documentos")
@@ -263,7 +293,7 @@ elif menu == "🔍 Buscar y Editar":
                 with colA:
                     st.write(f"**Área Responsable:** {datos.get('area_usuaria', 'N/A')}")
                     st.write(f"**Coordinación:** {datos.get('coordinacion_asignada', 'N/A')}")
-                    st.write(f"**Monto:** ${datos.get('monto', 0):,.2f}")
+                    st.write(f"**Monto:** ${float(datos.get('monto', 0)):,.2f}")
                 with colB:
                     st.write(f"**Estatus:** {datos.get('estatus', 'N/A')}")
                     st.write(f"**Fecha Registro:** {datos.get('fecha_oficio', 'N/A')}")
@@ -295,7 +325,6 @@ elif menu == "🔍 Buscar y Editar":
                             st.success("✅ ¡Base de datos actualizada! Cerrando expediente...")
                             st.balloons() 
                             
-                            import time
                             time.sleep(2.5) 
                             st.session_state.busqueda_activa = "" 
                             st.rerun() 
