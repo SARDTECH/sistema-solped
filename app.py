@@ -11,7 +11,7 @@ st.set_page_config(page_title="SIGAS - Metro CDMX", page_icon="🚇", layout="wi
 
 st.markdown("""
     <style>
-    /* 🛡️ BOTÓN ANTIPÁNICO: Flecha de menú siempre visible con borde naranja */
+    /* 🛡️ BOTÓN ANTIPÁNICO */
     [data-testid="stSidebarCollapseButton"] {
         display: block !important;
         visibility: visible !important;
@@ -25,40 +25,21 @@ st.markdown("""
         box-shadow: 2px 2px 10px rgba(0,0,0,0.2) !important;
         padding: 5px !important;
     }
-    [data-testid="stSidebarCollapseButton"] svg {
-        color: #F6831E !important;
-        width: 28px !important;
-        height: 28px !important;
-    }
+    [data-testid="stSidebarCollapseButton"] svg { color: #F6831E !important; width: 28px !important; height: 28px !important; }
 
-    /* Ajuste de espacio para que el título no choque con el botón */
     .main .block-container { padding-top: 4.5rem !important; }
-
-    /* Ocultar elementos nativos de Streamlit */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     .stDeployButton {display:none;}
 
-    /* Identidad Visual Metro CDMX */
-    :root {
-        --metro-naranja: #F6831E;
-        --metro-oscuro: #2C2C2C;
-    }
-    [data-testid="stSidebar"] {
-        background-color: #F8F9FA;
-        border-right: 4px solid var(--metro-naranja);
-    }
+    :root { --metro-naranja: #F6831E; --metro-oscuro: #2C2C2C; }
+    [data-testid="stSidebar"] { background-color: #F8F9FA; border-right: 4px solid var(--metro-naranja); }
     h1, h2, h3 { color: var(--metro-oscuro) !important; font-family: 'Arial', sans-serif; }
     [data-testid="stMetricValue"] { color: var(--metro-naranja) !important; font-weight: 900 !important; }
     
-    /* Botones Naranjas Estilo Institucional */
     .stButton>button { 
-        background-color: var(--metro-naranja); 
-        color: white; 
-        border-radius: 6px; 
-        border: none; 
-        font-weight: bold;
-        width: 100%;
+        background-color: var(--metro-naranja); color: white; border-radius: 6px; 
+        border: none; font-weight: bold; width: 100%;
     }
     .stButton>button:hover { background-color: var(--metro-oscuro); color: var(--metro-naranja); }
     </style>
@@ -79,10 +60,8 @@ supabase = init_connection()
 # ==========================================
 # 3. BARRA LATERAL (SIDEBAR)
 # ==========================================
-try:
-    st.sidebar.image("logo m.png", width=140)
-except:
-    st.sidebar.title("🚇 METRO")
+try: st.sidebar.image("logo m.png", width=140)
+except: st.sidebar.title("🚇 METRO")
 
 st.sidebar.title("Subgerencia de Adquisiciones")
 st.sidebar.markdown("---")
@@ -92,10 +71,12 @@ menu = st.sidebar.radio(
     ("📊 Dashboard Gerencial", "📝 Registrar SOLPED", "🛒 Agregar Artículos", "🔍 Buscar y Editar")
 )
 
-# --- Función de apoyo para fechas ---
-def limpiar_fecha(f_str):
+def limpiar_fecha_segura(f_str):
     try:
-        return pd.to_datetime(f_str, dayfirst=True, errors='coerce')
+        dt = pd.to_datetime(f_str, dayfirst=True, errors='coerce')
+        if dt is not pd.NaT and dt.tzinfo is not None:
+            dt = dt.tz_localize(None)
+        return dt
     except:
         return pd.NaT
 
@@ -112,27 +93,54 @@ if menu == "📊 Dashboard Gerencial":
         if df.empty:
             st.info("No hay datos registrados aún.")
         else:
-            # Procesamiento de montos y fechas
-            df['monto'] = pd.to_numeric(df['monto'], errors='coerce').fillna(0)
-            df['fecha_dt'] = df['fecha_oficio'].apply(limpiar_fecha)
+            # Procesamiento robusto de montos para asegurar las comas
+            df['monto'] = pd.to_numeric(df['monto'], errors='coerce').fillna(0).astype(float)
+            df['fecha_dt'] = df['fecha_oficio'].apply(limpiar_fecha_segura)
             
-            # Métricas Principales
+            # --- RANGO DE CONSULTA EN SIDEBAR ---
+            st.sidebar.markdown("---")
+            st.sidebar.subheader("📅 Rango de Consulta")
+            
+            df_con_fecha = df.dropna(subset=['fecha_dt'])
+            if not df_con_fecha.empty:
+                min_f = df_con_fecha['fecha_dt'].min().date()
+                max_f = df_con_fecha['fecha_dt'].max().date()
+                
+                rango = st.sidebar.date_input(
+                    "Seleccione Periodo:",
+                    value=(min_f, max_f),
+                    min_value=min_f,
+                    max_value=max_f,
+                    format="DD/MM/YYYY"
+                )
+                
+                if isinstance(rango, tuple) and len(rango) == 2:
+                    df_final = df_con_fecha[
+                        (df_con_fecha['fecha_dt'].dt.date >= rango[0]) & 
+                        (df_con_fecha['fecha_dt'].dt.date <= rango[1])
+                    ]
+                else:
+                    df_final = df_con_fecha
+            else:
+                df_final = df
+
+            # Métricas
             c1, c2, c3 = st.columns(3)
-            c1.metric("Total SOLPEDs", f"{len(df)}")
-            c2.metric("Inversión Total", f"${df['monto'].sum():,.2f}")
-            c3.metric("Ticket Promedio", f"${(df['monto'].mean()):,.2f}")
+            c1.metric("Total SOLPEDs", f"{len(df_final)}")
+            c2.metric("Inversión Total", f"${df_final['monto'].sum():,.2f}")
+            c3.metric("Ticket Promedio", f"${(df_final['monto'].mean() if len(df_final) > 0 else 0):,.2f}")
             
             st.divider()
             
-            # Tabla de Datos con Formato de Moneda $ MXN
+            # TABLA MAESTRA (Forzando formato de comas y moneda)
             st.subheader("📋 Listado Maestro de SOLPEDs")
             cols = ['numero_solped', 'area_usuaria', 'descripcion', 'monto', 'fecha_oficio', 'estatus', 'link_pdf']
-            existentes = [c for c in cols if c in df.columns]
+            existentes = [c for c in cols if c in df_final.columns]
             
             st.dataframe(
-                df[existentes],
+                df_final[existentes],
                 column_config={
-                    "monto": st.column_config.NumberColumn("Monto ($ MXN)", format="$ %.2f"),
+                    "monto": st.column_config.NumberColumn("Monto ($ MXN)", format="$ %,.2f"),
                     "link_pdf": st.column_config.LinkColumn("Expediente Digital"),
                     "numero_solped": "SOLPED #"
                 },
@@ -143,7 +151,7 @@ if menu == "📊 Dashboard Gerencial":
         st.error(f"Error al cargar Dashboard: {e}")
 
 # ==========================================
-# PANTALLA 2: REGISTRAR SOLPED (CON ESCUDO ANTI-DUPLICADOS)
+# PANTALLA 2: REGISTRAR SOLPED
 # ==========================================
 elif menu == "📝 Registrar SOLPED":
     st.title("📝 Registro de Nueva SOLPED")
@@ -177,15 +185,13 @@ elif menu == "📝 Registrar SOLPED":
                     st.success(f"✅ ¡SOLPED {num} registrada exitosamente!")
                     st.balloons()
                 except Exception as e:
-                    # ESCUDO PARA BUBU: Detectar si el número ya existe
                     if "duplicate key" in str(e).lower():
-                        st.warning(f"⚠️ La SOLPED **{num}** ya fue registrada anteriormente.")
-                        st.info("💡 **Acción recomendada:** Si quieres actualizar sus datos, ve al módulo **'🔍 Buscar y Editar'**.")
+                        st.warning(f"⚠️ La SOLPED **{num}** ya existe. Ve a 'Buscar y Editar'.")
                     else:
                         st.error(f"🚨 Error técnico: {e}")
 
 # ==========================================
-# PANTALLA 3: AGREGAR ARTÍCULOS (SEGMENTACIÓN CCP/CCE)
+# PANTALLA 3: AGREGAR ARTÍCULOS
 # ==========================================
 elif menu == "🛒 Agregar Artículos":
     st.title("🛒 Catálogo de Partidas por Oficio")
@@ -193,7 +199,6 @@ elif menu == "🛒 Agregar Artículos":
         res = supabase.table("solicitudes_solped").select("id, numero_solped").execute()
         if res.data:
             opciones = {str(s['numero_solped']): s['id'] for s in res.data}
-            
             with st.form("art_form"):
                 c1, c2 = st.columns(2)
                 with c1:
@@ -210,18 +215,16 @@ elif menu == "🛒 Agregar Artículos":
                             "solped_id": opciones[sol_sel], "codigo_articulo": cod.upper(),
                             "descripcion": dsc, "monto": mto, "coordinacion": tipo
                         }).execute()
-                        st.success(f"✅ Partida {cod.upper()} añadida a la SOLPED {sol_sel}")
-                    else:
-                        st.error("❌ Indique el código del artículo.")
+                        st.success(f"✅ Partida {cod.upper()} añadida.")
+                        st.balloons()
     except Exception as e:
-        st.error(f"Error en módulo de artículos: {e}")
+        st.error(f"Error: {e}")
 
 # ==========================================
-# PANTALLA 4: BUSCAR Y EDITAR (CON AUTO-RESETEO)
+# PANTALLA 4: BUSCAR Y EDITAR (AHORA CON DESCRIPCIÓN)
 # ==========================================
 elif menu == "🔍 Buscar y Editar":
     st.title("🔍 Localizador de Expedientes")
-    
     if 'busqueda_id' not in st.session_state: st.session_state.busqueda_id = ""
 
     col_srch, col_btn = st.columns([3, 1])
@@ -233,7 +236,6 @@ elif menu == "🔍 Buscar y Editar":
             
     if st.session_state.busqueda_id:
         res = supabase.table("solicitudes_solped").select("*").eq("numero_solped", st.session_state.busqueda_id).execute()
-        
         if res.data:
             item = res.data[0]
             st.success(f"✅ Expediente de la SOLPED {st.session_state.busqueda_id} listo para edición.")
@@ -244,17 +246,28 @@ elif menu == "🔍 Buscar y Editar":
                     new_m = st.number_input("Actualizar Monto ($)", value=float(item.get('monto', 0)))
                     new_l = st.text_input("Actualizar Link Drive", value=item.get('link_pdf', ''))
                 with cb:
-                    new_e = st.selectbox("Cambiar Estatus", ["EN PROCESO", "COMPLETADA", "CANCELADA"])
+                    # Buscamos el índice del estatus actual para que aparezca seleccionado por defecto
+                    lista_estatus = ["EN PROCESO", "COMPLETADA", "CANCELADA"]
+                    estatus_actual = item.get('estatus', 'EN PROCESO')
+                    idx_estatus = lista_estatus.index(estatus_actual) if estatus_actual in lista_estatus else 0
+                    
+                    new_e = st.selectbox("Cambiar Estatus", lista_estatus, index=idx_estatus)
+                
+                # NUEVO CAMPO: Edición de Descripción
+                new_d = st.text_area("Actualizar Descripción / Justificación", value=item.get('descripcion', ''))
                 
                 if st.form_submit_button("💾 Actualizar y Cerrar"):
                     supabase.table("solicitudes_solped").update({
-                        "monto": new_m, "link_pdf": new_l, "estatus": new_e
+                        "monto": new_m, 
+                        "link_pdf": new_l, 
+                        "estatus": new_e,
+                        "descripcion": new_d  # Guardamos la nueva descripción
                     }).eq("id", item['id']).execute()
                     
-                    st.success("✅ Cambios guardados. Regresando al inicio...")
+                    st.success("✅ Cambios guardados correctamente.")
                     st.balloons()
                     time.sleep(2)
                     st.session_state.busqueda_id = ""
                     st.rerun()
         else:
-            st.error("❌ No se encontró ningún registro con ese número.")
+            st.error("❌ No se encontró el registro. Verifique el número de SOLPED.")
