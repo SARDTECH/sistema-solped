@@ -11,33 +11,14 @@ st.set_page_config(page_title="SIGAS - Metro CDMX", page_icon="🚇", layout="wi
 
 st.markdown("""
     <style>
-    /* 🛡️ BLINDAJE ANTIPÁNICO DEL MENÚ COLAPSADO */
-    /* Obligamos a que la flecha de 'Abrir Sidebar' sea visible, tenga fondo blanco y borde */
-    /* Esto sobreescribe cualquier issue de zoom o resolución */
-    [data-testid="stSidebarCollapseButton"] {
-        display: block !important;
-        visibility: visible !important;
-        position: fixed !important;
-        top: 10px !important;
-        left: 10px !important;
-        background-color: white !important;
-        border: 1px solid #ddd !important;
-        border-radius: 6px !important;
-        z-index: 999999 !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-    }
-    
-    /* Hacemos la flecha naranja para que combine con el Metro */
-    [data-testid="stSidebarCollapseButton"] > button > svg {
-        color: var(--metro-naranja) !important;
-    }
-
-    /* Ocultar marcas de agua de Streamlit */
+    /* Ocultar menú de Streamlit y pie de página, pero DEJAR EL HEADER VIVO para la flecha */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    header {visibility: hidden;}
+    
+    /* Ocultamos específicamente el botón de "Deploy" para que no estorbe */
+    .stDeployButton {display:none;}
 
-    /* Diseño Corporativo Metro CDMX */
+    /* Identidad Corporativa Metro CDMX */
     :root {
         --metro-naranja: #F6831E;
         --metro-oscuro: #2C2C2C;
@@ -48,6 +29,8 @@ st.markdown("""
     }
     h1, h2, h3 { color: var(--metro-oscuro) !important; font-family: 'Arial', sans-serif; }
     [data-testid="stMetricValue"] { color: var(--metro-naranja) !important; font-weight: 900 !important; font-size: 2.5rem !important; }
+    
+    /* Botones del Sistema */
     .stButton>button { background-color: var(--metro-naranja); color: white; border-radius: 6px; border: none; font-weight: bold; }
     .stButton>button:hover { background-color: var(--metro-oscuro); color: var(--metro-naranja); }
     </style>
