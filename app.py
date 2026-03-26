@@ -160,13 +160,29 @@ elif menu == "📝 Registrar SOLPED":
             st.caption("☝️ Pega aquí el enlace de la carpeta que contiene la SOLPED, contratos y anexos.")
             
         desc = st.text_area("Justificación / Descripción Breve")
+        
         if st.form_submit_button("Subir al Sistema"):
             if numero == "":
                 st.error("❌ El Número de SOLPED es obligatorio.")
             else:
-                fecha_formato_db = fecha.strftime('%d-%m-%Y')
-                supabase.table("solicitudes_solped").insert({"numero_solped": numero, "area_usuaria": area, "coordinacion_asignada": coord, "monto": monto, "fecha_oficio": fecha_formato_db, "link_pdf": link_pdf, "descripcion": desc, "estatus": estatus}).execute()
-                st.success(f"✅ SOLPED {numero} registrada.")
+                try:
+                    fecha_formato_db = fecha.strftime('%d-%m-%Y')
+                    supabase.table("solicitudes_solped").insert({
+                        "numero_solped": numero, 
+                        "area_usuaria": area, 
+                        "coordinacion_asignada": coord, 
+                        "monto": monto, 
+                        "fecha_oficio": fecha_formato_db, 
+                        "link_pdf": link_pdf, 
+                        "descripcion": desc, 
+                        "estatus": estatus
+                    }).execute()
+                    st.success(f"✅ SOLPED {numero} registrada con éxito.")
+                except Exception as e:
+                    # AQUÍ ESTÁ LA MAGIA ESPÍA
+                    st.error("🚨 ALERTA TÉCNICA: EL SISTEMA DETECTÓ UN BLOQUEO 🚨")
+                    st.error(f"Detalle exacto del error: {str(e)}")
+                    st.info("💡 Director: Tómale una foto a este cuadro rojo y pásamelo. Con eso sabremos el 100% de la verdad.")
 
 # ==========================================
 # PANTALLA 3: AGREGAR ARTÍCULOS (VERSIÓN FINAL)
