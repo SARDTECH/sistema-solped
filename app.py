@@ -60,6 +60,25 @@ supabase = init_connection()
 # ==========================================
 # 3. FUNCIONES DE APOYO Y CALLBACKS (AUTO-FORMATO)
 # ==========================================
+# 📋 LISTA OFICIAL Y COMPLETA DE ÁREAS (Extraída de tu documento)
+LISTA_AREAS_METRO = [
+    "CAPITAL HUMANO",
+    "COORDINACIÓN DE EVALUACIÓN DE PROYECTOS Y MANTENIMIENTO DE ÁREAS GENERALES",
+    "DIRECCIÓN DE INSTALACIONES FIJAS",
+    "DIRECCIÓN DE MANTENIMIENTO DE MATERIAL RODANTE",
+    "DIRECCIÓN DE MEDIOS",
+    "DIRECCIÓN DE TRANSPORTACIÓN",
+    "DIRECCIÓN GENERAL DE ADMINISTRACIÓN Y FINANZAS",
+    "DIRECCIÓN GENERAL DE OPERACIÓN",
+    "GERENCIA DE ALMACENES Y SUMINISTROS",
+    "GERENCIA DE INGENIERÍA Y NUEVOS PROYECTOS",
+    "GERENCIA DE ORGANIZACIÓN Y SISTEMAS",
+    "GERENCIA DE SALUD Y BIENESTAR SOCIAL",
+    "GERENCIA DE SEGURIDAD INSTITUCIONAL",
+    "PREVIAS",
+    "OTRO"
+]
+
 def limpiar_fecha_segura(f_str):
     try:
         dt = pd.to_datetime(f_str, dayfirst=True, errors='coerce')
@@ -73,7 +92,6 @@ def limpiar_dinero(val_str):
         return float(val_limpio)
     except: return 0.0
 
-# 🌟 MAGIA EN VIVO: Estas funciones se disparan al salir de la casilla
 def format_reg():
     if st.session_state.reg_m: st.session_state.reg_m = f"{limpiar_dinero(st.session_state.reg_m):,.2f}"
 def format_art():
@@ -134,15 +152,14 @@ elif menu == "📝 Registrar SOLPED":
     st.title("📝 Registro de Nueva SOLPED")
     st.info("💡 Consejo: Escribe el monto y da clic en otra casilla para que se pongan las comas automáticamente.")
     
-    # 🌟 Formulario liberado (Sin 'st.form') para permitir edición en vivo
     col1, col2 = st.columns(2)
     with col1:
         num = st.text_input("Número de SOLPED / Oficio *")
-        area = st.selectbox("Área Usuaria", ["DIRECCIÓN DE INSTALACIONES FIJAS", "DIRECCIÓN DE MANTENIMIENTO DE MATERIAL RODANTE", "CAPITAL HUMANO", "DIRECCIÓN GENERAL DE OPERACIÓN", "OTRO"])
+        # 🌟 AQUÍ ESTÁ LA LISTA COMPLETA INYECTADA
+        area = st.selectbox("Área Usuaria", LISTA_AREAS_METRO)
         fec = st.date_input("Fecha de Documento", format="DD/MM/YYYY")
     with col2:
         if "reg_m" not in st.session_state: st.session_state.reg_m = ""
-        # 🌟 AQUÍ ESTÁ EL DISPARADOR EN VIVO (on_change=format_reg)
         mon_str = st.text_input("Monto Inicial ($ MXN)", key="reg_m", on_change=format_reg, placeholder="Ej. 12332302 (Las comas se pondrán solas)")
         coord = st.radio("Coordinación", ["CCP (Nacional)", "CCE (Extranjero)", "CCP y CCE (Ambas)"], horizontal=True)
         est = st.selectbox("Estatus Inicial", ["EN PROCESO", "COMPLETADA", "CANCELADA"])
@@ -160,7 +177,7 @@ elif menu == "📝 Registrar SOLPED":
                 supabase.table("solicitudes_solped").insert({"numero_solped": num, "area_usuaria": area, "monto": monto_limpio, "fecha_oficio": f_db, "coordinacion_asignada": coord, "estatus": est, "descripcion": det, "link_pdf": lnk}).execute()
                 st.success(f"✅ ¡SOLPED {num} registrada exitosamente por ${monto_limpio:,.2f}!")
                 st.balloons()
-                st.session_state.reg_m = "" # Limpiamos el monto tras guardar
+                st.session_state.reg_m = "" 
             except Exception as e:
                 if "duplicate key" in str(e).lower(): st.warning(f"⚠️ La SOLPED **{num}** ya existe. Ve a 'Buscar y Editar'.")
                 else: st.error(f"🚨 Error técnico: {e}")
@@ -214,7 +231,6 @@ elif menu == "🔍 Buscar y Editar":
             item = res.data[0]
             st.success(f"✅ Expediente de la SOLPED {st.session_state.busqueda_id} listo para edición.")
             
-            # Si es la primera vez que buscamos esta SOLPED, cargamos su monto a la memoria
             if 'edi_loaded' not in st.session_state or st.session_state.edi_loaded != st.session_state.busqueda_id:
                 st.session_state.edi_m = f"{float(item.get('monto', 0)):,.2f}"
                 st.session_state.edi_loaded = st.session_state.busqueda_id
