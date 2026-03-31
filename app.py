@@ -58,7 +58,28 @@ def init_connection():
 supabase = init_connection()
 
 # ==========================================
-# 3. BARRA LATERAL (SIDEBAR)
+# 3. FUNCIONES DE APOYO (FECHAS Y DINERO)
+# ==========================================
+def limpiar_fecha_segura(f_str):
+    try:
+        dt = pd.to_datetime(f_str, dayfirst=True, errors='coerce')
+        if dt is not pd.NaT and dt.tzinfo is not None:
+            dt = dt.tz_localize(None)
+        return dt
+    except:
+        return pd.NaT
+
+# 🌟 NUEVA FUNCIÓN: Transforma el texto de Bubu (con comas) en número real para la base de datos
+def limpiar_dinero(val_str):
+    try:
+        # Quitamos espacios, signos de dólar y comas
+        val_limpio = str(val_str).replace('$', '').replace(',', '').strip()
+        return float(val_limpio)
+    except:
+        return 0.0
+
+# ==========================================
+# 4. BARRA LATERAL (SIDEBAR)
 # ==========================================
 try: st.sidebar.image("logo m.png", width=140)
 except: st.sidebar.title("🚇 METRO")
@@ -70,15 +91,6 @@ menu = st.sidebar.radio(
     "Navegación del Sistema:",
     ("📊 Dashboard Gerencial", "📝 Registrar SOLPED", "🛒 Agregar Artículos", "🔍 Buscar y Editar")
 )
-
-def limpiar_fecha_segura(f_str):
-    try:
-        dt = pd.to_datetime(f_str, dayfirst=True, errors='coerce')
-        if dt is not pd.NaT and dt.tzinfo is not None:
-            dt = dt.tz_localize(None)
-        return dt
-    except:
-        return pd.NaT
 
 # ==========================================
 # PANTALLA 1: DASHBOARD GERENCIAL
@@ -104,25 +116,15 @@ if menu == "📊 Dashboard Gerencial":
                 min_f = df_con_fecha['fecha_dt'].min().date()
                 max_f = df_con_fecha['fecha_dt'].max().date()
                 
-                rango = st.sidebar.date_input(
-                    "Seleccione Periodo:",
-                    value=(min_f, max_f),
-                    min_value=min_f,
-                    max_value=max_f,
-                    format="DD/MM/YYYY"
-                )
+                rango = st.sidebar.date_input("Seleccione Periodo:", value=(min_f, max_f), min_value=min_f, max_value=max_f, format="DD/MM/YYYY")
                 
                 if isinstance(rango, tuple) and len(rango) == 2:
-                    df_final = df_con_fecha[
-                        (df_con_fecha['fecha_dt'].dt.date >= rango[0]) & 
-                        (df_con_fecha['fecha_dt'].dt.date <= rango[1])
-                    ]
+                    df_final = df_con_fecha[(df_con_fecha['fecha_dt'].dt.date >= rango[0]) & (df_con_fecha['fecha_dt'].dt.date <= rango[1])]
                 else:
                     df_final = df_con_fecha
             else:
                 df_final = df
 
-            # MÉTRICAS CON EL TEXTO "MXN"
             c1, c2, c3 = st.columns(3)
             c1.metric("Total SOLPEDs", f"{len(df_final)}")
             c2.metric("Inversión Total", f"${df_final['monto'].sum():,.2f} MXN")
@@ -141,8 +143,7 @@ if menu == "📊 Dashboard Gerencial":
                     "link_pdf": st.column_config.LinkColumn("Expediente Digital"),
                     "numero_solped": "SOLPED #"
                 },
-                use_container_width=True,
-                hide_index=True
+                use_container_width=True, hide_index=True
             )
     except Exception as e:
         st.error(f"Error al cargar Dashboard: {e}")
@@ -161,12 +162,10 @@ elif menu == "📝 Registrar SOLPED":
             area = st.selectbox("Área Usuaria", ["DIRECCIÓN DE INSTALACIONES FIJAS", "DIRECCIÓN DE MANTENIMIENTO DE MATERIAL RODANTE", "CAPITAL HUMANO", "DIRECCIÓN GENERAL DE OPERACIÓN", "OTRO"])
             fec = st.date_input("Fecha de Documento", format="DD/MM/YYYY")
         with col2:
-            # FORMATO DE DECIMALES .00 OBLIGATORIO
-            mon = st.number_input("Monto Inicial ($ MXN)", min_value=0.0, step=100.0, format="%.2f")
+            # 🌟 HACK: Caja de texto libre para que Bubu pueda poner comas
+            mon_str = st.text_input("Monto Inicial ($ MXN)", placeholder="Ej. 12,332,302.00")
             
-            # TERCERA OPCIÓN DE COORDINACIÓN AÑADIDA
             coord = st.radio("Coordinación", ["CCP (Nacional)", "CCE (Extranjero)", "CCP y CCE (Ambas)"], horizontal=True)
-            
             est = st.selectbox("Estatus Inicial", ["EN PROCESO", "COMPLETADA", "CANCELADA"])
         
         det = st.text_area("Descripción / Justificación del Gasto")
@@ -178,12 +177,15 @@ elif menu == "📝 Registrar SOLPED":
             else:
                 try:
                     f_db = fec.strftime('%d-%m-%Y')
+                    # Procesamos el monto para quitar las comas antes de guardar
+                    monto_limpio = limpiar_dinero(mon_str)
+                    
                     supabase.table("solicitudes_solped").insert({
-                        "numero_solped": num, "area_usuaria": area, "monto": mon,
+                        "numero_solped": num, "area_usuaria": area, "monto": monto_limpio,
                         "fecha_oficio": f_db, "coordinacion_asignada": coord,
                         "estatus": est, "descripcion": det, "link_pdf": lnk
                     }).execute()
-                    st.success(f"✅ ¡SOLPED {num} registrada exitosamente!")
+                    st.success(f"✅ ¡SOLPED {num} registrada exitosamente por ${monto_limpio:,.2f}!")
                     st.balloons()
                 except Exception as e:
                     if "duplicate key" in str(e).lower():
@@ -205,20 +207,21 @@ elif menu == "🛒 Agregar Artículos":
                 with c1:
                     sol_sel = st.selectbox("Vincular a SOLPED:", list(opciones.keys()))
                     cod = st.text_input("Código de Partida / Artículo *")
-                    # FORMATO DECIMAL
-                    mto = st.number_input("Monto de la Partida ($ MXN)", min_value=0.0, format="%.2f")
+                    
+                    # 🌟 HACK: Caja de texto para comas
+                    mto_str = st.text_input("Monto de la Partida ($ MXN)", placeholder="Ej. 1,500.00")
                 with c2:
-                    # TERCERA OPCIÓN DE COORDINACIÓN
                     tipo = st.radio("Segmentación de Compra:", ["CCP (Nacional)", "CCE (Extranjero)", "CCP y CCE (Ambas)"])
                     dsc = st.text_input("Descripción del Bien/Servicio")
                 
                 if st.form_submit_button("🚀 Registrar Artículo"):
                     if cod:
+                        monto_partida = limpiar_dinero(mto_str)
                         supabase.table("partidas_codigos").insert({
                             "solped_id": opciones[sol_sel], "codigo_articulo": cod.upper(),
-                            "descripcion": dsc, "monto": mto, "coordinacion": tipo
+                            "descripcion": dsc, "monto": monto_partida, "coordinacion": tipo
                         }).execute()
-                        st.success(f"✅ Partida {cod.upper()} añadida.")
+                        st.success(f"✅ Partida {cod.upper()} añadida por ${monto_partida:,.2f}.")
                         st.balloons()
     except Exception as e:
         st.error(f"Error: {e}")
@@ -246,29 +249,11 @@ elif menu == "🔍 Buscar y Editar":
             with st.form("edit_form"):
                 ca, cb = st.columns(2)
                 with ca:
-                    # FORMATO DECIMAL OBLIGATORIO AL EDITAR
-                    new_m = st.number_input("Actualizar Monto ($ MXN)", value=float(item.get('monto', 0)), format="%.2f")
+                    # 🌟 HACK: Mostramos el monto actual YA CON COMAS para que lo vea claro
+                    monto_actual = float(item.get('monto', 0))
+                    new_m_str = st.text_input("Actualizar Monto ($ MXN)", value=f"{monto_actual:,.2f}")
+                    
                     new_l = st.text_input("Actualizar Link Drive", value=item.get('link_pdf', ''))
                 with cb:
                     lista_estatus = ["EN PROCESO", "COMPLETADA", "CANCELADA"]
-                    estatus_actual = item.get('estatus', 'EN PROCESO')
-                    idx_estatus = lista_estatus.index(estatus_actual) if estatus_actual in lista_estatus else 0
-                    new_e = st.selectbox("Cambiar Estatus", lista_estatus, index=idx_estatus)
-                
-                new_d = st.text_area("Actualizar Descripción / Justificación", value=item.get('descripcion', ''))
-                
-                if st.form_submit_button("💾 Actualizar y Cerrar"):
-                    supabase.table("solicitudes_solped").update({
-                        "monto": new_m, 
-                        "link_pdf": new_l, 
-                        "estatus": new_e,
-                        "descripcion": new_d
-                    }).eq("id", item['id']).execute()
-                    
-                    st.success("✅ Cambios guardados correctamente.")
-                    st.balloons()
-                    time.sleep(2)
-                    st.session_state.busqueda_id = ""
-                    st.rerun()
-        else:
-            st.error("❌ No se encontró el registro. Verifique el número de SOLPED.")
+                    estatus_actual =
