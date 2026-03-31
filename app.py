@@ -256,4 +256,27 @@ elif menu == "🔍 Buscar y Editar":
                     new_l = st.text_input("Actualizar Link Drive", value=item.get('link_pdf', ''))
                 with cb:
                     lista_estatus = ["EN PROCESO", "COMPLETADA", "CANCELADA"]
-                    estatus_actual =
+                    estatus_actual = item.get('estatus', 'EN PROCESO')
+                    idx_estatus = lista_estatus.index(estatus_actual) if estatus_actual in lista_estatus else 0
+                    new_e = st.selectbox("Cambiar Estatus", lista_estatus, index=idx_estatus)
+                
+                new_d = st.text_area("Actualizar Descripción / Justificación", value=item.get('descripcion', ''))
+                
+                if st.form_submit_button("💾 Actualizar y Cerrar"):
+                    # Limpiamos el dinero por si lo editó y le puso comas nuevas
+                    monto_actualizado = limpiar_dinero(new_m_str)
+                    
+                    supabase.table("solicitudes_solped").update({
+                        "monto": monto_actualizado, 
+                        "link_pdf": new_l, 
+                        "estatus": new_e,
+                        "descripcion": new_d
+                    }).eq("id", item['id']).execute()
+                    
+                    st.success("✅ Cambios guardados correctamente.")
+                    st.balloons()
+                    time.sleep(2)
+                    st.session_state.busqueda_id = ""
+                    st.rerun()
+        else:
+            st.error("❌ No se encontró el registro. Verifique el número de SOLPED.")
