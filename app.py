@@ -93,11 +93,9 @@ if menu == "📊 Dashboard Gerencial":
         if df.empty:
             st.info("No hay datos registrados aún.")
         else:
-            # Procesamiento robusto de montos para asegurar las comas
             df['monto'] = pd.to_numeric(df['monto'], errors='coerce').fillna(0).astype(float)
             df['fecha_dt'] = df['fecha_oficio'].apply(limpiar_fecha_segura)
             
-            # --- RANGO DE CONSULTA EN SIDEBAR ---
             st.sidebar.markdown("---")
             st.sidebar.subheader("📅 Rango de Consulta")
             
@@ -124,15 +122,14 @@ if menu == "📊 Dashboard Gerencial":
             else:
                 df_final = df
 
-            # Métricas
+            # MÉTRICAS CON EL TEXTO "MXN"
             c1, c2, c3 = st.columns(3)
             c1.metric("Total SOLPEDs", f"{len(df_final)}")
-            c2.metric("Inversión Total", f"${df_final['monto'].sum():,.2f}")
-            c3.metric("Ticket Promedio", f"${(df_final['monto'].mean() if len(df_final) > 0 else 0):,.2f}")
+            c2.metric("Inversión Total", f"${df_final['monto'].sum():,.2f} MXN")
+            c3.metric("Ticket Promedio", f"${(df_final['monto'].mean() if len(df_final) > 0 else 0):,.2f} MXN")
             
             st.divider()
             
-            # TABLA MAESTRA (Forzando formato de comas y moneda)
             st.subheader("📋 Listado Maestro de SOLPEDs")
             cols = ['numero_solped', 'area_usuaria', 'descripcion', 'monto', 'fecha_oficio', 'estatus', 'link_pdf']
             existentes = [c for c in cols if c in df_final.columns]
@@ -164,8 +161,12 @@ elif menu == "📝 Registrar SOLPED":
             area = st.selectbox("Área Usuaria", ["DIRECCIÓN DE INSTALACIONES FIJAS", "DIRECCIÓN DE MANTENIMIENTO DE MATERIAL RODANTE", "CAPITAL HUMANO", "DIRECCIÓN GENERAL DE OPERACIÓN", "OTRO"])
             fec = st.date_input("Fecha de Documento", format="DD/MM/YYYY")
         with col2:
-            mon = st.number_input("Monto Inicial ($)", min_value=0.0, step=100.0)
-            coord = st.radio("Coordinación", ["CCP (Nacional)", "CCE (Extranjero)"], horizontal=True)
+            # FORMATO DE DECIMALES .00 OBLIGATORIO
+            mon = st.number_input("Monto Inicial ($ MXN)", min_value=0.0, step=100.0, format="%.2f")
+            
+            # TERCERA OPCIÓN DE COORDINACIÓN AÑADIDA
+            coord = st.radio("Coordinación", ["CCP (Nacional)", "CCE (Extranjero)", "CCP y CCE (Ambas)"], horizontal=True)
+            
             est = st.selectbox("Estatus Inicial", ["EN PROCESO", "COMPLETADA", "CANCELADA"])
         
         det = st.text_area("Descripción / Justificación del Gasto")
@@ -204,9 +205,11 @@ elif menu == "🛒 Agregar Artículos":
                 with c1:
                     sol_sel = st.selectbox("Vincular a SOLPED:", list(opciones.keys()))
                     cod = st.text_input("Código de Partida / Artículo *")
-                    mto = st.number_input("Monto de la Partida ($)", min_value=0.0)
+                    # FORMATO DECIMAL
+                    mto = st.number_input("Monto de la Partida ($ MXN)", min_value=0.0, format="%.2f")
                 with c2:
-                    tipo = st.radio("Segmentación de Compra:", ["CCP (Nacional)", "CCE (Extranjero)"])
+                    # TERCERA OPCIÓN DE COORDINACIÓN
+                    tipo = st.radio("Segmentación de Compra:", ["CCP (Nacional)", "CCE (Extranjero)", "CCP y CCE (Ambas)"])
                     dsc = st.text_input("Descripción del Bien/Servicio")
                 
                 if st.form_submit_button("🚀 Registrar Artículo"):
@@ -221,7 +224,7 @@ elif menu == "🛒 Agregar Artículos":
         st.error(f"Error: {e}")
 
 # ==========================================
-# PANTALLA 4: BUSCAR Y EDITAR (AHORA CON DESCRIPCIÓN)
+# PANTALLA 4: BUSCAR Y EDITAR
 # ==========================================
 elif menu == "🔍 Buscar y Editar":
     st.title("🔍 Localizador de Expedientes")
@@ -243,17 +246,15 @@ elif menu == "🔍 Buscar y Editar":
             with st.form("edit_form"):
                 ca, cb = st.columns(2)
                 with ca:
-                    new_m = st.number_input("Actualizar Monto ($)", value=float(item.get('monto', 0)))
+                    # FORMATO DECIMAL OBLIGATORIO AL EDITAR
+                    new_m = st.number_input("Actualizar Monto ($ MXN)", value=float(item.get('monto', 0)), format="%.2f")
                     new_l = st.text_input("Actualizar Link Drive", value=item.get('link_pdf', ''))
                 with cb:
-                    # Buscamos el índice del estatus actual para que aparezca seleccionado por defecto
                     lista_estatus = ["EN PROCESO", "COMPLETADA", "CANCELADA"]
                     estatus_actual = item.get('estatus', 'EN PROCESO')
                     idx_estatus = lista_estatus.index(estatus_actual) if estatus_actual in lista_estatus else 0
-                    
                     new_e = st.selectbox("Cambiar Estatus", lista_estatus, index=idx_estatus)
                 
-                # NUEVO CAMPO: Edición de Descripción
                 new_d = st.text_area("Actualizar Descripción / Justificación", value=item.get('descripcion', ''))
                 
                 if st.form_submit_button("💾 Actualizar y Cerrar"):
@@ -261,7 +262,7 @@ elif menu == "🔍 Buscar y Editar":
                         "monto": new_m, 
                         "link_pdf": new_l, 
                         "estatus": new_e,
-                        "descripcion": new_d  # Guardamos la nueva descripción
+                        "descripcion": new_d
                     }).eq("id", item['id']).execute()
                     
                     st.success("✅ Cambios guardados correctamente.")
